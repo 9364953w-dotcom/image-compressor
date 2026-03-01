@@ -135,9 +135,42 @@ pyinstaller 图片压缩工具.spec
 3. **资源释放**: 线程和 worker 对象需要在 finished 信号中 deleteLater
 4. **路径处理**: 使用 pathlib.Path，避免字符串拼接路径
 
+## 版本管理
+
+### 自动版本发布工具
+
+项目包含 `release.py` 工具，用于统一更新版本号：
+
+```bash
+# 用法
+python release.py <新版本号> [发布说明]
+
+# 示例
+python release.py 1.3.0 "新增批量水印功能"
+```
+
+该工具会自动更新以下文件中的版本号：
+- `src/config.py` - 软件版本常量
+- `README.md` - 文档标题
+- `AGENTS.md` - 项目信息
+
+### 对 AI 助手的指令
+
+当你需要发布新版本时，可以对我说：
+
+> "发布新版本 1.x.x，更新内容是 xxx"
+
+我会自动执行：
+1. 运行 `python release.py 1.x.x "xxx"`
+2. 提交 Git 并推送
+3. 确认所有文件已更新
+
 ## 最近修改记录
 
-- 最新 - feat: 添加预设配置、压缩预览、EXIF处理功能
+- `35c90db` - chore: 添加版本发布工具 release.py
+- `aefe8d6` - docs: 更新 AGENTS.md 版本号到 v1.2.0
+- `dbf75be` - docs: 更新 README 到 v1.2.0
+- `be014c8` - feat: 添加预设配置、压缩预览、EXIF处理功能
 - `71be911` - UI: 采用 Qt Fusion 风格 + 自定义深色调色板
 - `ca8b0f5` - UI: 移除标签页外边框
 - `93c3476` - UI: 采用 qdarkstyle 美化界面
