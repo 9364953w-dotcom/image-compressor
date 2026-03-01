@@ -2,6 +2,9 @@
 主窗口模块 - 功能增强版
 """
 
+from pathlib import Path
+from datetime import datetime
+
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QLabel, QFileDialog, QCheckBox, QProgressBar,
@@ -11,7 +14,6 @@ from PyQt5.QtWidgets import (
     QAbstractItemView
 )
 from PyQt5.QtCore import Qt, QThread
-from datetime import datetime
 
 from src.config import (
     APP_NAME, DEFAULT_QUALITY, DEFAULT_MIN_SIZE_MB,
@@ -365,22 +367,36 @@ class MainWindow(QWidget):
     
     def _load_history(self):
         """加载历史记录"""
-        history = config_manager.load_history()
-        self.history_combo.clear()
-        self.history_combo.addItem("")
-        for item in history:
-            display = f"{Path(item['input_path']).name}"
-            self.history_combo.addItem(display, item)
+        try:
+            history = config_manager.load_history()
+            self.history_combo.clear()
+            self.history_combo.addItem("")
+            for item in history:
+                if isinstance(item, dict) and 'input_path' in item:
+                    try:
+                        display = f"{Path(item['input_path']).name}"
+                        self.history_combo.addItem(display, item)
+                    except Exception:
+                        pass
+        except Exception as e:
+            print(f"加载历史记录失败: {e}")
     
     def _on_history_selected(self, text):
         """选择历史记录"""
         if not text:
             return
-        data = self.history_combo.currentData()
-        if data:
-            self.input_edit.setText(data["input_path"])
-            self.output_edit.setText(data["output_path"])
-            self.log_text.append(f"[历史] 加载历史记录: {data['input_path']}")
+        try:
+            data = self.history_combo.currentData()
+            if data and isinstance(data, dict):
+                input_path = data.get("input_path", "")
+                output_path = data.get("output_path", "")
+                if input_path:
+                    self.input_edit.setText(input_path)
+                if output_path:
+                    self.output_edit.setText(output_path)
+                self.log_text.append(f"[历史] 加载历史记录: {input_path}")
+        except Exception as e:
+            print(f"选择历史记录失败: {e}")
     
     def _select_input(self):
         """选择输入文件夹"""
@@ -563,9 +579,9 @@ class MainWindow(QWidget):
     def _export_stats(self):
         """导出统计到 CSV"""
         if not self.current_detailed_stats:
+            QMessageBox.information(self, "提示", "没有可导出的统计数据")
             return
         
-        from PyQt5.QtWidgets import QFileDialog
         import csv
         
         file_path, _ = QFileDialog.getSaveFileName(
@@ -586,12 +602,12 @@ class MainWindow(QWidget):
                 
                 for stat in self.current_detailed_stats:
                     writer.writerow([
-                        stat["index"],
-                        stat["filename"],
-                        stat["status"],
-                        stat["original_size"],
-                        stat["compressed_size"],
-                        stat["original_size"] - stat["compressed_size"],
+                        stat.get("index", 0),
+                        stat.get("filename", ""),
+                        stat.get("status", ""),
+                        stat.get("original_size", 0),
+                        stat.get("compressed_size", 0),
+                        stat.get("original_size", 0) - stat.get("compressed_size", 0),
                         f"{stat.get('savings_percent', 0):.2f}",
                         stat.get("dimensions_before", ""),
                         stat.get("dimensions_after", ""),
