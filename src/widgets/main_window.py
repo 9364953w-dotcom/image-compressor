@@ -11,7 +11,7 @@ from PyQt5.QtWidgets import (
     QSlider, QSpinBox, QTextEdit, QDoubleSpinBox, QMessageBox,
     QGroupBox, QFormLayout, QComboBox, QLineEdit, QTableWidget,
     QTableWidgetItem, QHeaderView, QTabWidget, QSplitter,
-    QAbstractItemView
+    QAbstractItemView, QMenuBar, QMenu, QAction
 )
 from PyQt5.QtCore import Qt, QThread
 
@@ -21,6 +21,7 @@ from src.config import (
 )
 from src.utils import format_bytes, setup_logging
 from src.widgets.drag_drop import DragDropLineEdit
+from src.widgets.about_dialog import AboutDialog
 from src.core.worker import CompressWorker
 
 
@@ -50,6 +51,26 @@ class MainWindow(QWidget):
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(20, 20, 20, 20)
         main_layout.setSpacing(16)
+        
+        # ========== 菜单栏 ==========
+        menubar = QMenuBar()
+        
+        # 文件菜单
+        file_menu = menubar.addMenu("文件")
+        
+        exit_action = QAction("退出", self)
+        exit_action.setShortcut("Ctrl+Q")
+        exit_action.triggered.connect(self.close)
+        file_menu.addAction(exit_action)
+        
+        # 帮助菜单
+        help_menu = menubar.addMenu("帮助")
+        
+        about_action = QAction("关于", self)
+        about_action.triggered.connect(self._show_about)
+        help_menu.addAction(about_action)
+        
+        main_layout.setMenuBar(menubar)
         
         # ========== 标题 ==========
         title_widget = QWidget()
@@ -678,6 +699,11 @@ class MainWindow(QWidget):
         if "准备就绪" not in self.stats_label.text():
             self.log_text.append("-" * 40)
             self.log_text.append("任务结束")
+    
+    def _show_about(self):
+        """显示关于对话框"""
+        dialog = AboutDialog(self)
+        dialog.exec_()
     
     def closeEvent(self, event):
         """处理窗口关闭事件"""
