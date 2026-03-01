@@ -94,9 +94,34 @@ palette.setColor(QPalette.Text, Qt.white)
 
 ## 打包命令
 
+### 本地打包
+
 ```bash
 pyinstaller 图片压缩工具.spec
 ```
+
+### GitHub Actions 自动构建
+
+项目已配置 GitHub Actions 工作流 (`.github/workflows/build.yml`)：
+
+**触发条件：**
+- 推送到 main 分支
+- 推送标签 `v*` (如 v1.2.0)
+- 手动触发 (workflow_dispatch)
+
+**构建产物：**
+- **macOS**: `.app` 和 `.dmg`
+- **Windows**: `.exe` 和 `.zip`
+
+**自动发布：**
+- 推送标签时自动创建 Release
+- 自动上传构建产物到 Release
+
+**手动触发构建：**
+1. 进入 GitHub 仓库
+2. 点击 Actions 标签
+3. 选择 "Build Executables"
+4. 点击 "Run workflow"
 
 ## 类说明
 
