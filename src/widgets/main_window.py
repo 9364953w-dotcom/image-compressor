@@ -321,6 +321,20 @@ class MainWindow(QWidget):
         
         # ========== 下半部分：标签页 ==========
         self.tab_widget = QTabWidget()
+        # 去掉标签页外边框
+        self.tab_widget.setDocumentMode(True)
+        self.tab_widget.setStyleSheet("""
+            QTabWidget::pane {
+                border: none;
+                background-color: transparent;
+            }
+            QTabBar::tab {
+                padding: 8px 16px;
+                margin-right: 4px;
+                border-top-left-radius: 4px;
+                border-top-right-radius: 4px;
+            }
+        """)
         
         # 日志标签页
         self.log_text = QTextEdit()
