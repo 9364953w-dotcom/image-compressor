@@ -16,7 +16,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, QThread
 
 from src.config import (
-    APP_NAME, DEFAULT_QUALITY, DEFAULT_MIN_SIZE_MB,
+    APP_NAME, __version__, DEFAULT_QUALITY, DEFAULT_MIN_SIZE_MB,
     RENAME_PATTERNS, OUTPUT_FORMATS, config_manager
 )
 from src.utils import format_bytes, setup_logging
@@ -40,9 +40,128 @@ class MainWindow(QWidget):
         self.setMinimumSize(900, 800)
         self.resize(1000, 900)
         
+        # 设置应用程序样式
+        self._setup_styles()
         self._setup_ui()
         self._connect_signals()
         self._load_history()
+    
+    def _setup_styles(self):
+        """设置应用程序样式 - 使复选框更醒目"""
+        self.setStyleSheet("""
+            /* 复选框样式 - 醒目设计 */
+            QCheckBox {
+                spacing: 8px;
+                font-weight: bold;
+            }
+            QCheckBox::indicator {
+                width: 22px;
+                height: 22px;
+                border-radius: 4px;
+                border: 2px solid #4a5568;
+                background-color: #ffffff;
+            }
+            QCheckBox::indicator:checked {
+                background-color: #00d2ff;
+                border-color: #00d2ff;
+            }
+            QCheckBox::indicator:hover {
+                border-color: #00d2ff;
+            }
+            
+            /* 分组框样式 */
+            QGroupBox {
+                font-weight: bold;
+                border: 2px solid #cccccc;
+                border-radius: 8px;
+                margin-top: 12px;
+                padding-top: 8px;
+                padding-bottom: 8px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 5px;
+            }
+            
+            /* 按钮样式 */
+            QPushButton {
+                padding: 6px 12px;
+                border-radius: 4px;
+                border: 1px solid #cccccc;
+                background-color: #f0f0f0;
+            }
+            QPushButton:hover {
+                background-color: #e0e0e0;
+                border-color: #00d2ff;
+            }
+            QPushButton:default {
+                background-color: #00d2ff;
+                color: white;
+                border-color: #00d2ff;
+                font-weight: bold;
+            }
+            QPushButton:default:hover {
+                background-color: #00c6ff;
+            }
+            QPushButton:disabled {
+                background-color: #cccccc;
+                color: #888888;
+            }
+            
+            /* 下拉框样式 */
+            QComboBox {
+                padding: 4px 8px;
+                border: 2px solid #cccccc;
+                border-radius: 4px;
+                background-color: white;
+                min-width: 80px;
+            }
+            QComboBox:hover {
+                border-color: #00d2ff;
+            }
+            QComboBox::drop-down {
+                border: none;
+                width: 24px;
+            }
+            QComboBox::down-arrow {
+                image: none;
+                border-left: 5px solid transparent;
+                border-right: 5px solid transparent;
+                border-top: 6px solid #666666;
+                width: 0;
+                height: 0;
+            }
+            
+            /* 进度条样式 */
+            QProgressBar {
+                border: 1px solid #cccccc;
+                border-radius: 4px;
+                text-align: center;
+                height: 20px;
+            }
+            QProgressBar::chunk {
+                background-color: #00d2ff;
+                border-radius: 3px;
+            }
+            
+            /* 表格样式 */
+            QTableWidget {
+                border: 1px solid #cccccc;
+                border-radius: 4px;
+                gridline-color: #e0e0e0;
+            }
+            QTableWidget::item:selected {
+                background-color: #00d2ff;
+                color: white;
+            }
+            QHeaderView::section {
+                background-color: #f0f0f0;
+                padding: 6px;
+                border: 1px solid #cccccc;
+                font-weight: bold;
+            }
+        """)
     
     def _setup_ui(self):
         """设置用户界面"""
@@ -51,7 +170,7 @@ class MainWindow(QWidget):
         main_layout.setSpacing(10)
         
         # ========== 标题 ==========
-        title_label = QLabel(APP_NAME)
+        title_label = QLabel(f"{APP_NAME} v{__version__}")
         title_label.setAlignment(Qt.AlignCenter)
         font = title_label.font()
         font.setPointSize(18)
@@ -73,7 +192,7 @@ class MainWindow(QWidget):
         path_layout = QFormLayout(path_group)
         path_layout.setSpacing(8)
         
-        # 输入路径 + 历史记录
+        # 输入路径
         input_layout = QHBoxLayout()
         self.input_edit = DragDropLineEdit()
         self.input_edit.setPlaceholderText("选择或拖拽输入文件夹...")
@@ -84,13 +203,24 @@ class MainWindow(QWidget):
         btn_input.clicked.connect(self._select_input)
         input_layout.addWidget(btn_input)
         
-        self.history_combo = QComboBox()
-        self.history_combo.setFixedWidth(150)
-        self.history_combo.setPlaceholderText("历史记录")
-        self.history_combo.currentTextChanged.connect(self._on_history_selected)
-        input_layout.addWidget(self.history_combo)
-        
         path_layout.addRow("输入文件夹：", input_layout)
+        
+        # 历史记录（单独一行，更清晰）
+        history_layout = QHBoxLayout()
+        history_layout.addStretch()
+        
+        history_label = QLabel("快速选择历史文件夹：")
+        history_label.setStyleSheet("color: #666666; font-size: 12px;")
+        history_layout.addWidget(history_label)
+        
+        self.history_combo = QComboBox()
+        self.history_combo.setFixedWidth(200)
+        self.history_combo.setPlaceholderText("-- 选择之前使用过的文件夹 --")
+        self.history_combo.setToolTip("点击选择之前压缩过的文件夹，会自动填充输入和输出路径")
+        self.history_combo.currentTextChanged.connect(self._on_history_selected)
+        history_layout.addWidget(self.history_combo)
+        
+        path_layout.addRow("", history_layout)
         
         # 输出路径
         output_layout = QHBoxLayout()
