@@ -7,7 +7,7 @@ import os
 import shutil
 import tempfile
 from pathlib import Path
-from typing import Tuple, Literal
+from typing import Tuple, Literal, Optional, Dict, Any
 
 from PIL import Image, ImageFile
 
@@ -15,6 +15,7 @@ from src.config import (
     DEFAULT_COMPRESS_LEVEL_PNG,
     DEFAULT_WEBP_METHOD,
     IMAGE_EXTENSIONS,
+    config_manager,
 )
 
 # 解除 Pillow 图像尺寸限制
@@ -25,7 +26,135 @@ ImageFile.LOAD_TRUNCATED_IMAGES = True
 logger = logging.getLogger(__name__)
 
 # 状态类型定义
-CompressStatus = Literal["processed", "skipped", "too_small", "failed"]
+CompressStatus = Literal["processed", "skipped", "too_small", "failed", "cached"]
+
+
+def calculate_new_size(
+    img: Image.Image,
+    max_width: int,
+    max_height: int,
+    keep_ratio: bool = True
+) -> Tuple[int, int]:
+    """
+    计算调整后尺寸
+    
+    Args:
+        img: 原图
+        max_width: 最大宽度（0 表示不限制）
+        max_height: 最大高度（0 表示不限制）
+        keep_ratio: 是否保持比例
+        
+    Returns:
+        (新宽度, 新高度)
+    """
+    orig_width, orig_height = img.size
+    
+    # 如果都不限制，返回原尺寸
+    if max_width <= 0 and max_height <= 0:
+        return orig_width, orig_height
+    
+    new_width, new_height = orig_width, orig_height
+    
+    if keep_ratio:
+        # 计算缩放比例
+        ratio = 1.0
+        
+        if max_width > 0 and orig_width > max_width:
+            ratio = min(ratio, max_width / orig_width)
+        
+        if max_height > 0 and orig_height > max_height:
+            ratio = min(ratio, max_height / orig_height)
+        
+        new_width = int(orig_width * ratio)
+        new_height = int(orig_height * ratio)
+    else:
+        # 不保持比例，直接调整到指定大小
+        if max_width > 0:
+            new_width = max_width
+        if max_height > 0:
+            new_height = max_height
+    
+    # 确保至少为 1
+    new_width = max(1, new_width)
+    new_height = max(1, new_height)
+    
+    return new_width, new_height
+
+
+def smart_compress(
+    img: Image.Image,
+    dst_path: Path,
+    target_size_kb: int,
+    tolerance: float = 0.1,
+    output_format: str = "jpg",
+) -> Tuple[bool, int]:
+    """
+    智能压缩 - 自动寻找最佳质量参数
+    
+    Args:
+        img: 图片对象
+        dst_path: 目标路径
+        target_size_kb: 目标大小（KB）
+        tolerance: 容差比例
+        output_format: 输出格式
+        
+    Returns:
+        (是否成功, 最终文件大小)
+    """
+    target_bytes = target_size_kb * 1024
+    min_quality, max_quality = 10, 95
+    best_quality = 85
+    best_size = float('inf')
+    best_temp_path = None
+    
+    # 二分查找最佳质量
+    temp_dir = tempfile.mkdtemp()
+    
+    try:
+        for _ in range(6):  # 最多6次尝试
+            quality = (min_quality + max_quality) // 2
+            
+            temp_path = Path(temp_dir) / f"test_{quality}.tmp"
+            
+            # 保存测试
+            if output_format in ('jpg', 'jpeg'):
+                _save_jpeg(img, temp_path, quality)
+            elif output_format == 'webp':
+                _save_webp(img, temp_path, quality)
+            else:
+                break
+            
+            size = temp_path.stat().st_size
+            
+            # 如果在容差范围内，直接返回
+            if abs(size - target_bytes) / target_bytes <= tolerance:
+                best_quality = quality
+                best_size = size
+                best_temp_path = temp_path
+                break
+            
+            # 记录最佳结果
+            if abs(size - target_bytes) < abs(best_size - target_bytes):
+                best_quality = quality
+                best_size = size
+                best_temp_path = temp_path
+            
+            # 调整质量范围
+            if size > target_bytes:
+                max_quality = quality - 1
+            else:
+                min_quality = quality + 1
+        
+        # 使用最佳结果
+        if best_temp_path and best_temp_path.exists():
+            shutil.copy2(best_temp_path, dst_path)
+            return True, best_size
+        
+        return False, 0
+        
+    finally:
+        # 清理临时文件
+        shutil.rmtree(temp_dir, ignore_errors=True)
 
 
 def compress_image(
@@ -35,7 +164,16 @@ def compress_image(
     quality: int,
     min_size_bytes: int,
     overwrite: bool = False,
-) -> Tuple[Path, CompressStatus, int, int]:
+    max_width: int = 0,
+    max_height: int = 0,
+    keep_ratio: bool = True,
+    output_format: str = "original",
+    smart_mode: bool = False,
+    target_size_kb: int = 0,
+    rename_pattern: Optional[str] = None,
+    file_index: int = 0,
+    settings_hash: Optional[str] = None,
+) -> Tuple[Path, CompressStatus, int, int, Dict[str, Any]]:
     """
     压缩单张图片
     
@@ -44,38 +182,98 @@ def compress_image(
         input_root: 输入根目录
         output_root: 输出根目录
         quality: 压缩质量 (1-100)
-        min_size_bytes: 最小文件大小（小于此值的文件跳过）
+        min_size_bytes: 最小文件大小
         overwrite: 是否直接覆盖原文件
+        max_width: 最大宽度（0 表示不限制）
+        max_height: 最大高度（0 表示不限制）
+        keep_ratio: 是否保持比例
+        output_format: 输出格式（original/jpg/png/webp）
+        smart_mode: 是否启用智能压缩
+        target_size_kb: 智能压缩目标大小（KB）
+        rename_pattern: 重命名模式
+        file_index: 文件序号（用于重命名）
+        settings_hash: 设置哈希（用于增量压缩）
         
     Returns:
-        Tuple[源路径, 状态, 原始大小, 新大小]
+        Tuple[源路径, 状态, 原始大小, 新大小, 详细信息]
     """
     orig_size = 0
+    details = {
+        "original_size": 0,
+        "compressed_size": 0,
+        "savings_percent": 0,
+        "dimensions_before": "",
+        "dimensions_after": "",
+        "format_before": "",
+        "format_after": "",
+        "quality_used": quality,
+        "resized": False,
+        "renamed": False,
+        "new_name": "",
+    }
     
     try:
         # 获取原始文件大小
         orig_size = src_path.stat().st_size
+        details["original_size"] = orig_size
         
         # 检查文件大小
         if orig_size <= min_size_bytes:
-            return src_path, "too_small", orig_size, 0
+            return src_path, "too_small", orig_size, 0, details
         
-        # 计算目标路径
+        # 检查增量压缩缓存
+        if settings_hash and config_manager.is_file_processed(src_path, settings_hash):
+            return src_path, "cached", orig_size, orig_size, details
+        
+        # 确定输出格式
+        suffix = src_path.suffix.lower()
+        details["format_before"] = suffix
+        
+        if output_format == "original":
+            output_ext = suffix
+        else:
+            output_ext = f".{output_format}"
+        
+        details["format_after"] = output_ext
+        
+        # 确定输出路径
         if overwrite:
-            # 覆盖模式：原路径即为目标路径
             dst_path = src_path
         else:
-            dst_path = output_root / src_path.relative_to(input_root)
+            rel_path = src_path.relative_to(input_root)
+            # 应用重命名模式
+            if rename_pattern and rename_pattern != "{name}":
+                from datetime import datetime
+                name_without_ext = src_path.stem
+                new_name = rename_pattern.format(
+                    name=name_without_ext,
+                    index=file_index + 1,
+                    prefix="",
+                    date=datetime.now().strftime("%Y%m%d"),
+                )
+                rel_path = rel_path.parent / f"{new_name}{output_ext}"
+                details["renamed"] = True
+                details["new_name"] = new_name
+            else:
+                # 只改扩展名
+                if output_ext != suffix:
+                    rel_path = rel_path.with_suffix(output_ext)
+            
+            dst_path = output_root / rel_path
         
         # 检查文件是否已存在（非覆盖模式下跳过）
         if not overwrite and dst_path.exists():
-            return src_path, "skipped", orig_size, dst_path.stat().st_size
+            existing_size = dst_path.stat().st_size
+            return src_path, "skipped", orig_size, existing_size, details
+        
+        # 创建目标目录
+        if not overwrite:
+            dst_path.parent.mkdir(parents=True, exist_ok=True)
         
         # 覆盖模式下使用临时文件
         temp_path = None
         actual_save_path = dst_path
         if overwrite:
-            # 创建临时文件
             temp_fd, temp_path_str = tempfile.mkstemp(
                 suffix=src_path.suffix,
                 dir=src_path.parent,
@@ -84,59 +282,95 @@ def compress_image(
             os.close(temp_fd)
             temp_path = Path(temp_path_str)
             actual_save_path = temp_path
-        else:
-            # 创建目标目录
-            dst_path.parent.mkdir(parents=True, exist_ok=True)
         
         # 处理图片
         with Image.open(src_path) as img:
-            # 转换模式，保留 PNG 透明度
-            suffix = src_path.suffix.lower()
+            # 记录原始尺寸
+            orig_width, orig_height = img.size
+            details["dimensions_before"] = f"{orig_width}x{orig_height}"
             
-            if suffix == '.png':
-                # PNG 保持 RGBA 模式以保留透明度
-                if img.mode not in ("RGBA", "RGB", "P"):
+            # 调整尺寸
+            new_width, new_height = calculate_new_size(img, max_width, max_height, keep_ratio)
+            if (new_width, new_height) != (orig_width, orig_height):
+                img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                details["resized"] = True
+                details["dimensions_after"] = f"{new_width}x{new_height}"
+            else:
+                details["dimensions_after"] = details["dimensions_before"]
+            
+            # 转换模式
+            actual_format = output_ext.lstrip('.').lower()
+            if actual_format == 'jpg':
+                actual_format = 'jpeg'
+            
+            if actual_format == 'png':
+                if img.mode not in ("RGBA", "RGB", "P", "L"):
                     img = img.convert("RGBA")
             elif img.mode in ("RGBA", "P"):
-                # 其他格式转 RGB（无透明度需求）
                 img = img.convert("RGB")
             elif img.mode == "CMYK":
                 img = img.convert("RGB")
             
-            # 根据格式保存
-            if suffix in ('.jpg', '.jpeg'):
-                _save_jpeg(img, actual_save_path, quality)
-            elif suffix == '.png':
-                _save_png(img, actual_save_path)
-            elif suffix == '.webp':
-                _save_webp(img, actual_save_path, quality)
+            # 保存图片
+            if smart_mode and target_size_kb > 0 and actual_format in ('jpeg', 'webp'):
+                # 智能压缩模式
+                success, new_size = smart_compress(
+                    img, actual_save_path, target_size_kb, 
+                    output_format=actual_format
+                )
+                if not success:
+                    # 智能压缩失败，使用普通压缩
+                    if actual_format == 'jpeg':
+                        _save_jpeg(img, actual_save_path, quality)
+                    else:
+                        _save_webp(img, actual_save_path, quality)
             else:
-                # 其他格式使用默认保存
-                img.save(actual_save_path)
+                # 普通压缩模式
+                if actual_format in ('jpg', 'jpeg'):
+                    _save_jpeg(img, actual_save_path, quality)
+                    details["quality_used"] = quality
+                elif actual_format == 'png':
+                    _save_png(img, actual_save_path)
+                elif actual_format == 'webp':
+                    _save_webp(img, actual_save_path, quality)
+                    details["quality_used"] = quality
+                else:
+                    img.save(actual_save_path)
         
         # 覆盖模式下替换原文件
         if overwrite and temp_path:
-            # 原子性替换：先备份原文件（可选），然后替换
             backup_path = src_path.with_suffix(f"{src_path.suffix}.backup")
             try:
-                # 创建原文件备份（压缩成功后删除）
                 shutil.copy2(src_path, backup_path)
-                # 替换原文件
                 shutil.move(str(temp_path), str(src_path))
-                # 删除备份
                 backup_path.unlink(missing_ok=True)
             except Exception as e:
-                # 恢复备份
                 if backup_path.exists():
                     shutil.move(str(backup_path), str(src_path))
                 raise e
         
         new_size = dst_path.stat().st_size
-        return src_path, "processed", orig_size, new_size
+        details["compressed_size"] = new_size
+        
+        # 计算节省比例
+        if orig_size > 0:
+            details["savings_percent"] = ((orig_size - new_size) / orig_size) * 100
+        
+        # 更新缓存
+        if settings_hash:
+            config_manager.mark_file_processed(
+                src_path, settings_hash,
+                {"size": new_size, "path": str(dst_path)}
+            )
+        
+        return src_path, "processed", orig_size, new_size, details
         
     except Exception as e:
         logger.error(f"处理失败 {src_path}: {e}", exc_info=True)
-        return src_path, "failed", orig_size, 0
+        # 清理临时文件
+        if temp_path and temp_path.exists():
+            temp_path.unlink(missing_ok=True)
+        return src_path, "failed", orig_size, 0, details
 
 
 def _save_jpeg(img: Image.Image, dst_path: Path, quality: int) -> None:
@@ -150,7 +384,6 @@ def _save_jpeg(img: Image.Image, dst_path: Path, quality: int) -> None:
     if exif is not None:
         save_kwargs["exif"] = exif
     
-    # 确保是 RGB 模式
     if img.mode != "RGB":
         img = img.convert("RGB")
     
