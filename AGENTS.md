@@ -24,15 +24,17 @@ image-compressor/
 ├── src/
 │   ├── __init__.py
 │   ├── __main__.py          # 程序入口 (Fusion 风格 + 深色主题)
-│   ├── config.py            # 配置常量 + ConfigManager (历史记录/缓存)
+│   ├── config.py            # 配置常量 + ConfigManager (历史记录/缓存/预设)
 │   ├── utils.py             # 工具函数 (format_bytes, setup_logging)
 │   ├── core/
 │   │   ├── __init__.py
-│   │   ├── compressor.py    # 图片压缩核心 (尺寸调整、格式转换、智能压缩)
+│   │   ├── compressor.py    # 图片压缩核心 (尺寸调整、格式转换、智能压缩、EXIF处理)
 │   │   └── worker.py        # 多线程工作器 (智能线程控制、详细统计)
 │   ├── widgets/
 │   │   ├── __init__.py
 │   │   ├── drag_drop.py     # 拖拽输入框
+│   │   ├── about_dialog.py  # 关于对话框 (软件信息、作者、版权)
+│   │   ├── exif_dialog.py   # EXIF查看对话框
 │   │   └── main_window.py   # 主窗口 (所有 UI 组件和逻辑)
 │   └── resources/
 │       └── icon.icns        # 应用图标
@@ -61,6 +63,11 @@ image-compressor/
 7. **智能线程** - 根据文件大小动态调整线程数
 8. **增量压缩** - 跳过已用相同设置处理过的文件
 
+### 新增功能 (v1.2.0)
+9. **预设配置** - 内置4种预设（网页用/手机分享/高质量存档/缩略图），支持自定义预设
+10. **压缩预览** - 预览第一张图片的压缩效果，显示预估大小
+11. **EXIF处理** - 保留/移除EXIF信息，自动旋转，查看EXIF详情
+
 ## UI 主题
 
 当前使用 **Qt Fusion 风格** + **自定义深色调色板**：
@@ -76,7 +83,14 @@ palette.setColor(QPalette.Text, Qt.white)
 
 - **历史记录**: `~/.image-compressor/.history.json` (最多10条)
 - **增量缓存**: `~/.image-compressor/.compress_cache.json`
+- **预设配置**: `~/.image-compressor/.presets.json`
 - **日志文件**: `compress.log`
+
+### 内置预设
+1. **网页用** - 质量80%，宽度1920px，适合网站展示
+2. **手机分享** - 质量75%，宽度1080px，目标200KB
+3. **高质量存档** - 质量95%，保持原尺寸
+4. **缩略图** - 质量60%，尺寸300x300
 
 ## 打包命令
 
@@ -100,6 +114,19 @@ pyinstaller 图片压缩工具.spec
 - load_history() / save_history() - 历史记录管理
 - load_cache() / save_cache() - 增量压缩缓存
 - is_file_processed() / mark_file_processed() - 文件处理状态
+- load_presets() / save_presets() - 预设配置管理
+- save_custom_preset() - 保存自定义预设
+- delete_preset() - 删除预设
+
+### AboutDialog (widgets/about_dialog.py)
+- 显示软件信息、开发者、版权、技术栈
+- 3个标签页：信息/技术栈/致谢
+- 可点击链接跳转 GitHub
+
+### ExifDialog (widgets/exif_dialog.py)
+- 显示图片 EXIF 信息
+- 基本信息表：相机、日期、尺寸、GPS
+- 完整 EXIF 数据查看
 
 ## 开发注意事项
 
@@ -110,6 +137,7 @@ pyinstaller 图片压缩工具.spec
 
 ## 最近修改记录
 
+- 最新 - feat: 添加预设配置、压缩预览、EXIF处理功能
 - `71be911` - UI: 采用 Qt Fusion 风格 + 自定义深色调色板
 - `ca8b0f5` - UI: 移除标签页外边框
 - `93c3476` - UI: 采用 qdarkstyle 美化界面
@@ -118,4 +146,5 @@ pyinstaller 图片压缩工具.spec
 - `c7fc7a6` - fix: 修复闪退问题（Path 导入缺失）
 - `ae22f16` - docs: 更新 README，添加 v1.1.0 新功能说明
 - `171b467` - v1.1.0: 新增8大功能
+- `c17d32a` - feat: 添加关于对话框（完整版）
 - `fc35be3` - Initial commit: 图片批量压缩工具 v1.0.0

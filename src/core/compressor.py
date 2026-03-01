@@ -157,6 +157,68 @@ def smart_compress(
         shutil.rmtree(temp_dir, ignore_errors=True)
 
 
+def get_exif_info(src_path: Path) -> Dict[str, Any]:
+    """
+    获取图片的 EXIF 信息
+    
+    Args:
+        src_path: 图片路径
+        
+    Returns:
+        EXIF 信息字典
+    """
+    info = {
+        "has_exif": False,
+        "camera": "",
+        "date": "",
+        "size": "",
+        "gps": "",
+        "orientation": 0,
+        "raw": {},
+    }
+    
+    try:
+        from PIL.ExifTags import TAGS, GPSTAGS
+        
+        with Image.open(src_path) as img:
+            exif = img._getexif()
+            if not exif:
+                return info
+            
+            info["has_exif"] = True
+            info["raw"] = {TAGS.get(tag, tag): str(value) for tag, value in exif.items()}
+            
+            # 相机信息
+            make = exif.get(0x010f, "")
+            model = exif.get(0x0110, "")
+            if make or model:
+                info["camera"] = f"{make} {model}".strip()
+            
+            # 拍摄日期
+            date_str = exif.get(0x9003, "") or exif.get(0x0132, "")
+            if date_str:
+                info["date"] = str(date_str)
+            
+            # 图片尺寸
+            width = exif.get(0xA002, 0)
+            height = exif.get(0xA003, 0)
+            if width and height:
+                info["size"] = f"{width}x{height}"
+            
+            # GPS 信息
+            gps_info = exif.get(0x8825)
+            if gps_info:
+                info["gps"] = "有 GPS 信息"
+            
+            # 方向
+            info["orientation"] = exif.get(0x0112, 1)
+            
+    except Exception as e:
+        logger.debug(f"读取 EXIF 失败 {src_path}: {e}")
+    
+    return info
+
+
 def compress_image(
     src_path: Path,
     input_root: Path,
@@ -173,6 +235,8 @@ def compress_image(
     rename_pattern: Optional[str] = None,
     file_index: int = 0,
     settings_hash: Optional[str] = None,
+    keep_exif: bool = True,
+    auto_rotate: bool = True,
 ) -> Tuple[Path, CompressStatus, int, int, Dict[str, Any]]:
     """
     压缩单张图片
@@ -193,6 +257,8 @@ def compress_image(
         rename_pattern: 重命名模式
         file_index: 文件序号（用于重命名）
         settings_hash: 设置哈希（用于增量压缩）
+        keep_exif: 是否保留 EXIF 信息
+        auto_rotate: 是否根据 EXIF 方向自动旋转
         
     Returns:
         Tuple[源路径, 状态, 原始大小, 新大小, 详细信息]
@@ -210,6 +276,8 @@ def compress_image(
         "resized": False,
         "renamed": False,
         "new_name": "",
+        "exif_kept": keep_exif,
+        "rotated": False,
     }
     
     try:
@@ -289,6 +357,32 @@ def compress_image(
             orig_width, orig_height = img.size
             details["dimensions_before"] = f"{orig_width}x{orig_height}"
             
+            # 根据 EXIF 方向自动旋转
+            if auto_rotate:
+                try:
+                    from PIL import ExifTags
+                    orientation = None
+                    for tag, value in img._getexif().items():
+                        if ExifTags.TAGS.get(tag) == 'Orientation':
+                            orientation = value
+                            break
+                    
+                    if orientation:
+                        rotate_map = {
+                            3: Image.ROTATE_180,
+                            6: Image.ROTATE_270,
+                            8: Image.ROTATE_90,
+                        }
+                        if orientation in rotate_map:
+                            img = img.transpose(rotate_map[orientation])
+                            details["rotated"] = True
+                            # 旋转后交换宽高
+                            if orientation in [6, 8]:
+                                orig_width, orig_height = orig_height, orig_width
+                                details["dimensions_before"] = f"{orig_width}x{orig_height}"
+                except Exception:
+                    pass
+            
             # 调整尺寸
             new_width, new_height = calculate_new_size(img, max_width, max_height, keep_ratio)
             if (new_width, new_height) != (orig_width, orig_height):
@@ -321,18 +415,18 @@ def compress_image(
                 if not success:
                     # 智能压缩失败，使用普通压缩
                     if actual_format == 'jpeg':
-                        _save_jpeg(img, actual_save_path, quality)
+                        _save_jpeg(img, actual_save_path, quality, keep_exif)
                     else:
-                        _save_webp(img, actual_save_path, quality)
+                        _save_webp(img, actual_save_path, quality, keep_exif)
             else:
                 # 普通压缩模式
                 if actual_format in ('jpg', 'jpeg'):
-                    _save_jpeg(img, actual_save_path, quality)
+                    _save_jpeg(img, actual_save_path, quality, keep_exif)
                     details["quality_used"] = quality
                 elif actual_format == 'png':
                     _save_png(img, actual_save_path)
                 elif actual_format == 'webp':
-                    _save_webp(img, actual_save_path, quality)
+                    _save_webp(img, actual_save_path, quality, keep_exif)
                     details["quality_used"] = quality
                 else:
                     img.save(actual_save_path)
@@ -373,16 +467,18 @@ def compress_image(
         return src_path, "failed", orig_size, 0, details
 
 
-def _save_jpeg(img: Image.Image, dst_path: Path, quality: int) -> None:
-    """保存为 JPEG 格式，保留 EXIF"""
-    exif = img.info.get('exif')
+def _save_jpeg(img: Image.Image, dst_path: Path, quality: int, keep_exif: bool = True) -> None:
+    """保存为 JPEG 格式"""
     save_kwargs = {
         "format": "JPEG",
         "quality": quality,
         "optimize": True,
     }
-    if exif is not None:
-        save_kwargs["exif"] = exif
+    
+    if keep_exif:
+        exif = img.info.get('exif')
+        if exif is not None:
+            save_kwargs["exif"] = exif
     
     if img.mode != "RGB":
         img = img.convert("RGB")
@@ -400,15 +496,17 @@ def _save_png(img: Image.Image, dst_path: Path) -> None:
     img.save(dst_path, **save_kwargs)
 
 
-def _save_webp(img: Image.Image, dst_path: Path, quality: int) -> None:
-    """保存为 WebP 格式，保留 EXIF"""
-    exif = img.info.get('exif')
+def _save_webp(img: Image.Image, dst_path: Path, quality: int, keep_exif: bool = True) -> None:
+    """保存为 WebP 格式"""
     save_kwargs = {
         "format": "WEBP",
         "quality": quality,
         "method": DEFAULT_WEBP_METHOD,
     }
-    if exif is not None:
-        save_kwargs["exif"] = exif
+    
+    if keep_exif:
+        exif = img.info.get('exif')
+        if exif is not None:
+            save_kwargs["exif"] = exif
     
     img.save(dst_path, **save_kwargs)

@@ -22,7 +22,9 @@ from src.config import (
 from src.utils import format_bytes, setup_logging
 from src.widgets.drag_drop import DragDropLineEdit
 from src.widgets.about_dialog import AboutDialog
+from src.widgets.exif_dialog import ExifDialog
 from src.core.worker import CompressWorker
+from src.core.compressor import get_exif_info, compress_image
 
 
 class MainWindow(QWidget):
@@ -151,6 +153,93 @@ class MainWindow(QWidget):
         path_layout.addRow("输出文件夹：", output_layout)
         
         top_layout.addWidget(path_group)
+        
+        # ========== 预设配置 ==========
+        preset_group = QGroupBox("🎯 预设配置")
+        preset_layout = QHBoxLayout(preset_group)
+        preset_layout.setSpacing(12)
+        
+        preset_layout.addWidget(QLabel("选择预设:"))
+        
+        self.preset_combo = QComboBox()
+        self.preset_combo.setFixedWidth(180)
+        self.preset_combo.setPlaceholderText("-- 选择预设 --")
+        self.preset_combo.currentIndexChanged.connect(self._on_preset_selected)
+        preset_layout.addWidget(self.preset_combo)
+        
+        self.preset_desc_label = QLabel("")
+        self.preset_desc_label.setStyleSheet("color: #78909c; font-size: 12px;")
+        preset_layout.addWidget(self.preset_desc_label)
+        
+        preset_layout.addStretch()
+        
+        # 预设操作按钮
+        self.save_preset_btn = QPushButton("💾 保存当前为预设")
+        self.save_preset_btn.clicked.connect(self._save_preset)
+        preset_layout.addWidget(self.save_preset_btn)
+        
+        self.manage_preset_btn = QPushButton("⚙️ 管理")
+        self.manage_preset_btn.clicked.connect(self._manage_presets)
+        preset_layout.addWidget(self.manage_preset_btn)
+        
+        top_layout.addWidget(preset_group)
+        
+        # 加载预设列表
+        self._load_presets()
+        
+        # ========== 压缩预览 ==========
+        preview_group = QGroupBox("👁️ 压缩预览")
+        preview_layout = QVBoxLayout(preview_group)
+        preview_layout.setSpacing(10)
+        
+        # 预览控制行
+        preview_control = QHBoxLayout()
+        
+        self.preview_btn = QPushButton("🔍 预览第一张图片")
+        self.preview_btn.clicked.connect(self._preview_compression)
+        preview_control.addWidget(self.preview_btn)
+        
+        self.exif_btn = QPushButton("📋 查看EXIF")
+        self.exif_btn.clicked.connect(self._show_exif)
+        preview_control.addWidget(self.exif_btn)
+        
+        preview_control.addStretch()
+        
+        # EXIF 选项
+        self.keep_exif_cb = QCheckBox("保留 EXIF 信息")
+        self.keep_exif_cb.setChecked(True)
+        preview_control.addWidget(self.keep_exif_cb)
+        
+        self.auto_rotate_cb = QCheckBox("自动旋转（根据EXIF方向）")
+        self.auto_rotate_cb.setChecked(True)
+        preview_control.addWidget(self.auto_rotate_cb)
+        
+        preview_layout.addLayout(preview_control)
+        
+        # 预览结果区域
+        preview_result = QHBoxLayout()
+        
+        self.preview_original_label = QLabel("原图: -")
+        self.preview_original_label.setStyleSheet("color: #b0bec5;")
+        preview_result.addWidget(self.preview_original_label)
+        
+        preview_result.addWidget(QLabel("→"))
+        
+        self.preview_compressed_label = QLabel("压缩后: -")
+        self.preview_compressed_label.setStyleSheet("color: #4caf50;")
+        preview_result.addWidget(self.preview_compressed_label)
+        
+        preview_result.addWidget(QLabel("|"))
+        
+        self.preview_savings_label = QLabel("节省: -")
+        self.preview_savings_label.setStyleSheet("color: #80cbc4;")
+        preview_result.addWidget(self.preview_savings_label)
+        
+        preview_result.addStretch()
+        
+        preview_layout.addLayout(preview_result)
+        
+        top_layout.addWidget(preview_group)
         
         # 压缩选项
         options_group = QGroupBox("⚙️ 压缩选项")
@@ -552,6 +641,8 @@ class MainWindow(QWidget):
         smart_mode = self.smart_cb.isChecked()
         target_size_kb = self.target_size_spin.value() if smart_mode else 0
         rename_pattern = self._get_rename_pattern()
+        keep_exif = self.keep_exif_cb.isChecked()
+        auto_rotate = self.auto_rotate_cb.isChecked()
         
         self.thread.started.connect(
             lambda: self.worker.run(
@@ -564,6 +655,7 @@ class MainWindow(QWidget):
                 output_format,
                 smart_mode, target_size_kb,
                 rename_pattern,
+                keep_exif, auto_rotate,
             )
         )
         
@@ -703,6 +795,270 @@ class MainWindow(QWidget):
     def _show_about(self):
         """显示关于对话框"""
         dialog = AboutDialog(self)
+        dialog.exec_()
+    
+    def _load_presets(self):
+        """加载预设列表"""
+        try:
+            self.preset_combo.clear()
+            self.preset_combo.addItem("-- 自定义 --", None)
+            
+            presets = config_manager.load_presets()
+            for preset in presets:
+                name = preset.get("name", "未命名")
+                desc = preset.get("description", "")
+                self.preset_combo.addItem(name, preset)
+        except Exception as e:
+            print(f"加载预设失败: {e}")
+    
+    def _on_preset_selected(self, index):
+        """选择预设"""
+        if index <= 0:
+            return
+        
+        preset = self.preset_combo.currentData()
+        if not preset:
+            return
+        
+        settings = preset.get("settings", {})
+        
+        # 应用预设设置
+        self.quality_spin.setValue(settings.get("quality", DEFAULT_QUALITY))
+        self.quality_slider.setValue(settings.get("quality", DEFAULT_QUALITY))
+        
+        format_map = {"original": 0, "jpg": 1, "png": 2, "webp": 3}
+        self.format_combo.setCurrentIndex(format_map.get(settings.get("output_format"), 0))
+        
+        self.resize_cb.setChecked(settings.get("max_width", 0) > 0 or settings.get("max_height", 0) > 0)
+        self.max_width_spin.setValue(settings.get("max_width", 0))
+        self.max_height_spin.setValue(settings.get("max_height", 0))
+        self.keep_ratio_cb.setChecked(settings.get("keep_ratio", True))
+        
+        self.smart_cb.setChecked(settings.get("smart_mode", False))
+        self.target_size_spin.setValue(settings.get("target_size_kb", 200))
+        
+        self.min_size_spin.setValue(settings.get("min_size_mb", DEFAULT_MIN_SIZE_MB))
+        
+        # 显示描述
+        desc = preset.get("description", "")
+        self.preset_desc_label.setText(f"({desc})")
+        
+        self.log_text.append(f"[预设] 已加载: {preset.get('name')}")
+    
+    def _save_preset(self):
+        """保存当前设置为预设"""
+        from PyQt5.QtWidgets import QInputDialog, QLineEdit
+        
+        name, ok = QInputDialog.getText(self, "保存预设", "预设名称:", QLineEdit.Normal, "")
+        if not ok or not name:
+            return
+        
+        # 检查是否已存在
+        presets = config_manager.load_presets()
+        default_names = {"网页用", "手机分享", "高质量存档", "缩略图"}
+        
+        if name in default_names:
+            QMessageBox.warning(self, "保存失败", "不能使用内置预设名称")
+            return
+        
+        desc, ok = QInputDialog.getText(self, "保存预设", "描述:", QLineEdit.Normal, "")
+        
+        settings = {
+            "quality": self.quality_spin.value(),
+            "output_format": self._get_output_format(),
+            "max_width": self.max_width_spin.value() if self.resize_cb.isChecked() else 0,
+            "max_height": self.max_height_spin.value() if self.resize_cb.isChecked() else 0,
+            "keep_ratio": self.keep_ratio_cb.isChecked(),
+            "smart_mode": self.smart_cb.isChecked(),
+            "target_size_kb": self.target_size_spin.value(),
+            "min_size_mb": self.min_size_spin.value(),
+        }
+        
+        if config_manager.save_custom_preset(name, desc, settings):
+            self._load_presets()
+            # 选中新保存的预设
+            for i in range(self.preset_combo.count()):
+                if self.preset_combo.itemText(i) == name:
+                    self.preset_combo.setCurrentIndex(i)
+                    break
+            QMessageBox.information(self, "保存成功", f"预设 '{name}' 已保存")
+        else:
+            QMessageBox.warning(self, "保存失败", "保存预设时出错")
+    
+    def _manage_presets(self):
+        """管理预设"""
+        from PyQt5.QtWidgets import QListWidget, QDialog, QVBoxLayout, QHBoxLayout
+        
+        dialog = QDialog(self)
+        dialog.setWindowTitle("管理预设")
+        dialog.setMinimumSize(400, 300)
+        
+        layout = QVBoxLayout(dialog)
+        
+        list_widget = QListWidget()
+        presets = config_manager.load_presets()
+        default_names = {"网页用", "手机分享", "高质量存档", "缩略图"}
+        
+        for preset in presets:
+            name = preset.get("name", "未命名")
+            if name not in default_names:
+                list_widget.addItem(name)
+        
+        layout.addWidget(list_widget)
+        
+        btn_layout = QHBoxLayout()
+        
+        delete_btn = QPushButton("删除")
+        delete_btn.clicked.connect(lambda: self._delete_selected_preset(list_widget, dialog))
+        btn_layout.addWidget(delete_btn)
+        
+        btn_layout.addStretch()
+        
+        close_btn = QPushButton("关闭")
+        close_btn.clicked.connect(dialog.accept)
+        btn_layout.addWidget(close_btn)
+        
+        layout.addLayout(btn_layout)
+        dialog.exec_()
+    
+    def _delete_selected_preset(self, list_widget, dialog):
+        """删除选中的预设"""
+        item = list_widget.currentItem()
+        if not item:
+            QMessageBox.information(dialog, "提示", "请先选择要删除的预设")
+            return
+        
+        name = item.text()
+        reply = QMessageBox.question(dialog, "确认删除", f"确定删除预设 '{name}' 吗？")
+        
+        if reply == QMessageBox.Yes:
+            if config_manager.delete_preset(name):
+                list_widget.takeItem(list_widget.currentRow())
+                self._load_presets()
+                QMessageBox.information(dialog, "删除成功", f"预设 '{name}' 已删除")
+            else:
+                QMessageBox.warning(dialog, "删除失败", "无法删除该预设")
+    
+    def _preview_compression(self):
+        """预览第一张图片的压缩效果"""
+        input_dir = self.input_edit.text().strip()
+        
+        if not input_dir:
+            QMessageBox.warning(self, "提示", "请先选择输入文件夹")
+            return
+        
+        input_path = Path(input_dir)
+        if not input_path.exists():
+            QMessageBox.warning(self, "错误", "输入文件夹不存在")
+            return
+        
+        # 查找第一张图片
+        from src.config import IMAGE_EXTENSIONS
+        image_files = [
+            p for p in input_path.iterdir()
+            if p.is_file() and p.suffix.lower() in IMAGE_EXTENSIONS
+        ]
+        
+        if not image_files:
+            QMessageBox.information(self, "提示", "输入文件夹中没有图片")
+            return
+        
+        first_image = image_files[0]
+        
+        # 执行压缩预览
+        try:
+            import tempfile
+            
+            with tempfile.NamedTemporaryFile(suffix=first_image.suffix, delete=False) as tmp:
+                tmp_path = Path(tmp.name)
+            
+            # 压缩参数
+            quality = self.quality_spin.value()
+            max_width = self.max_width_spin.value() if self.resize_cb.isChecked() else 0
+            max_height = self.max_height_spin.value() if self.resize_cb.isChecked() else 0
+            keep_ratio = self.keep_ratio_cb.isChecked()
+            output_format = self._get_output_format()
+            keep_exif = self.keep_exif_cb.isChecked()
+            auto_rotate = self.auto_rotate_cb.isChecked()
+            
+            # 执行压缩
+            _, status, orig_size, new_size, details = compress_image(
+                src_path=first_image,
+                input_root=input_path,
+                output_root=tmp_path.parent,
+                quality=quality,
+                min_size_bytes=0,
+                overwrite=False,
+                max_width=max_width,
+                max_height=max_height,
+                keep_ratio=keep_ratio,
+                output_format=output_format,
+                smart_mode=self.smart_cb.isChecked(),
+                target_size_kb=self.target_size_spin.value() if self.smart_cb.isChecked() else 0,
+                keep_exif=keep_exif,
+                auto_rotate=auto_rotate,
+            )
+            
+            # 清理临时文件
+            if tmp_path.exists():
+                tmp_path.unlink()
+            
+            # 显示预览结果
+            if status == "processed":
+                self.preview_original_label.setText(f"原图: {format_bytes(orig_size)}")
+                self.preview_compressed_label.setText(f"压缩后: {format_bytes(new_size)}")
+                
+                savings = orig_size - new_size
+                savings_pct = (savings / orig_size * 100) if orig_size > 0 else 0
+                self.preview_savings_label.setText(f"节省: {format_bytes(savings)} ({savings_pct:.1f}%)")
+                
+                # 显示详细信息
+                dim_info = ""
+                if details.get("resized"):
+                    dim_info = f" 尺寸: {details.get('dimensions_before')} → {details.get('dimensions_after')}"
+                
+                QMessageBox.information(
+                    self, "预览结果",
+                    f"文件: {first_image.name}\n"
+                    f"原大小: {format_bytes(orig_size)}\n"
+                    f"压缩后: {format_bytes(new_size)}\n"
+                    f"节省: {format_bytes(savings)} ({savings_pct:.1f}%)\n"
+                    f"状态: {status}{dim_info}"
+                )
+            else:
+                QMessageBox.information(self, "预览结果", f"无法预览: {status}")
+                
+        except Exception as e:
+            QMessageBox.warning(self, "预览失败", f"预览时出错: {str(e)}")
+    
+    def _show_exif(self):
+        """显示第一张图片的EXIF信息"""
+        input_dir = self.input_edit.text().strip()
+        
+        if not input_dir:
+            QMessageBox.warning(self, "提示", "请先选择输入文件夹")
+            return
+        
+        input_path = Path(input_dir)
+        if not input_path.exists():
+            QMessageBox.warning(self, "错误", "输入文件夹不存在")
+            return
+        
+        # 查找第一张图片
+        from src.config import IMAGE_EXTENSIONS
+        image_files = [
+            p for p in input_path.iterdir()
+            if p.is_file() and p.suffix.lower() in IMAGE_EXTENSIONS
+        ]
+        
+        if not image_files:
+            QMessageBox.information(self, "提示", "输入文件夹中没有图片")
+            return
+        
+        first_image = image_files[0]
+        
+        # 显示EXIF对话框
+        dialog = ExifDialog(first_image, self)
         dialog.exec_()
     
     def closeEvent(self, event):

@@ -81,6 +81,8 @@ class CompressWorker(QObject):
         smart_mode: bool = False,
         target_size_kb: int = 0,
         rename_pattern: Optional[str] = None,
+        keep_exif: bool = True,
+        auto_rotate: bool = True,
     ) -> None:
         """
         执行批量压缩任务
@@ -92,6 +94,15 @@ class CompressWorker(QObject):
             include_subdirs: 是否包含子目录
             min_size_mb: 最小文件大小 (MB)
             overwrite: 是否覆盖原文件
+            max_width: 最大宽度（0 表示不限制）
+            max_height: 最大高度（0 表示不限制）
+            keep_ratio: 是否保持比例
+            output_format: 输出格式
+            smart_mode: 是否启用智能压缩
+            target_size_kb: 智能压缩目标大小（KB）
+            rename_pattern: 重命名模式
+            keep_exif: 是否保留 EXIF 信息
+            auto_rotate: 是否根据 EXIF 方向自动旋转
             max_width: 最大宽度（0 表示不限制）
             max_height: 最大高度（0 表示不限制）
             keep_ratio: 是否保持比例
@@ -158,6 +169,8 @@ class CompressWorker(QObject):
                     rename_pattern,
                     i,
                     settings_hash,
+                    keep_exif,
+                    auto_rotate,
                 ): (f, i)
                 for i, f in enumerate(all_files)
             }
