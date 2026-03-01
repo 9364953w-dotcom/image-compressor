@@ -20,8 +20,8 @@ class AboutDialog(QDialog):
         super().__init__(parent)
         
         self.setWindowTitle("关于")
-        self.setMinimumSize(500, 450)
-        self.resize(500, 500)
+        self.setMinimumSize(550, 650)
+        self.resize(550, 700)
         
         self._setup_ui()
     
@@ -179,7 +179,7 @@ class AboutDialog(QDialog):
         
         core_text = QTextEdit()
         core_text.setReadOnly(True)
-        core_text.setMaximumHeight(120)
+        core_text.setFixedHeight(100)
         core_text.setPlainText(
             "• Python 3.8+ - 编程语言\n"
             "• PyQt5 5.15+ - GUI 框架\n"
@@ -200,7 +200,7 @@ class AboutDialog(QDialog):
         
         sys_text = QTextEdit()
         sys_text.setReadOnly(True)
-        sys_text.setMaximumHeight(100)
+        sys_text.setFixedHeight(90)
         sys_text.setPlainText(
             f"Python: {platform.python_version()}\n"
             f"Qt: {QT_VERSION_STR}\n"
@@ -237,6 +237,7 @@ class AboutDialog(QDialog):
         
         thanks_text = QTextEdit()
         thanks_text.setReadOnly(True)
+        thanks_text.setFixedHeight(320)
         thanks_text.setPlainText(
             "特别感谢以下开源项目和社区:\n\n"
             "🎨 Qt Framework\n"
