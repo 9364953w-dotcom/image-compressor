@@ -1,0 +1,122 @@
+name: Build Executables
+
+on:
+  push:
+    branches: [ main ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install PyQt5 Pillow pyinstaller
+    
+    - name: Build macOS App
+      run: |
+        pyinstaller --name="图片压缩工具" \
+          --windowed \
+          --icon=icon.icns \
+          --add-data "src/resources:src/resources" \
+          --clean \
+          src/__main__.py
+    
+    - name: Create DMG
+      run: |
+        brew install create-dmg
+        create-dmg \
+          --volname "图片压缩工具" \
+          --window-pos 200 120 \
+          --window-size 800 400 \
+          --icon-size 100 \
+          --app-drop-link 600 185 \
+          "dist/图片压缩工具-macOS.dmg" \
+          "dist/图片压缩工具.app"
+      continue-on-error: true
+    
+    - name: Upload macOS Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: 图片压缩工具-macOS
+        path: |
+          dist/图片压缩工具.app
+          dist/图片压缩工具-macOS.dmg
+        retention-days: 30
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install PyQt5 Pillow pyinstaller
+    
+    - name: Build Windows EXE
+      run: |
+        pyinstaller --name="图片压缩工具" `
+          --windowed `
+          --icon=icon.png `
+          --add-data "src/resources;src/resources" `
+          --clean `
+          src/__main__.py
+    
+    - name: Create ZIP
+      run: |
+        Compress-Archive -Path "dist/图片压缩工具" -DestinationPath "dist/图片压缩工具-Windows.zip"
+    
+    - name: Upload Windows Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: 图片压缩工具-Windows
+        path: |
+          dist/图片压缩工具
+          dist/图片压缩工具-Windows.zip
+        retention-days: 30
+
+  release:
+    needs: [build-macos, build-windows]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+    - name: Download macOS Artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: 图片压缩工具-macOS
+        path: ./macos
+    
+    - name: Download Windows Artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: 图片压缩工具-Windows
+        path: ./windows
+    
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          ./macos/图片压缩工具-macOS.dmg
+          ./windows/图片压缩工具-Windows.zip
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
