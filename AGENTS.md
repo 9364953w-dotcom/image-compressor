@@ -1,0 +1,121 @@
+# AGENTS.md - 项目背景文档
+
+> 本文档用于帮助 AI 助手快速了解项目背景，避免上下文丢失
+
+## 项目概述
+
+**项目名称**: 图片批量压缩工具  
+**版本**: v1.1.0  
+**GitHub**: https://github.com/9364953w-dotcom/image-compressor  
+
+一个基于 PyQt5 的图形化图片批量压缩工具，支持多线程并行处理、智能压缩、格式转换等高级功能。
+
+## 技术栈
+
+- **GUI 框架**: PyQt5 (Qt Fusion 风格 + 自定义深色调色板)
+- **图像处理**: Pillow (PIL)
+- **打包工具**: PyInstaller
+- **Python 版本**: 3.8+
+
+## 项目结构
+
+```
+image-compressor/
+├── src/
+│   ├── __init__.py
+│   ├── __main__.py          # 程序入口 (Fusion 风格 + 深色主题)
+│   ├── config.py            # 配置常量 + ConfigManager (历史记录/缓存)
+│   ├── utils.py             # 工具函数 (format_bytes, setup_logging)
+│   ├── core/
+│   │   ├── __init__.py
+│   │   ├── compressor.py    # 图片压缩核心 (尺寸调整、格式转换、智能压缩)
+│   │   └── worker.py        # 多线程工作器 (智能线程控制、详细统计)
+│   ├── widgets/
+│   │   ├── __init__.py
+│   │   ├── drag_drop.py     # 拖拽输入框
+│   │   └── main_window.py   # 主窗口 (所有 UI 组件和逻辑)
+│   └── resources/
+│       └── icon.icns        # 应用图标
+├── 图片压缩工具.spec        # PyInstaller 打包配置
+├── requirements.txt         # 依赖列表
+├── README.md                # 项目说明文档
+└── AGENTS.md                # 本文档
+```
+
+## 核心功能
+
+### 基础功能
+- 文件夹拖拽选择
+- 支持格式: JPG、PNG、WebP、BMP、TIFF
+- 覆盖模式 / 输出到指定文件夹
+- 子文件夹递归处理
+- 多线程并行压缩
+
+### 高级功能 (v1.1.0)
+1. **尺寸调整** - 限制最大宽度/高度，保持比例
+2. **格式转换** - 转换为 JPG/PNG/WebP 或保持原格式
+3. **智能压缩** - 自动寻找最佳质量参数达到目标文件大小
+4. **历史记录** - 保存常用路径，下拉框快速选择
+5. **批量重命名** - 支持序号、日期、前缀等命名模式
+6. **详细统计** - 表格展示每个文件的压缩详情
+7. **智能线程** - 根据文件大小动态调整线程数
+8. **增量压缩** - 跳过已用相同设置处理过的文件
+
+## UI 主题
+
+当前使用 **Qt Fusion 风格** + **自定义深色调色板**：
+
+```python
+palette.setColor(QPalette.Window, QColor(53, 53, 53))      # #353535
+palette.setColor(QPalette.Base, QColor(42, 42, 42))        # #2a2a2a
+palette.setColor(QPalette.Highlight, QColor(42, 130, 218)) # #2a82da
+palette.setColor(QPalette.Text, Qt.white)
+```
+
+## 配置和数据存储
+
+- **历史记录**: `~/.image-compressor/.history.json` (最多10条)
+- **增量缓存**: `~/.image-compressor/.compress_cache.json`
+- **日志文件**: `compress.log`
+
+## 打包命令
+
+```bash
+pyinstaller 图片压缩工具.spec
+```
+
+## 类说明
+
+### CompressWorker (core/worker.py)
+- 多线程工作器，使用 ThreadPoolExecutor
+- 信号: progress, file_completed, result, finished
+- 方法: calculate_optimal_workers() 动态线程控制
+
+### compress_image (core/compressor.py)
+- 单张图片压缩函数
+- 支持: 尺寸调整、格式转换、智能压缩、重命名、增量检测
+- 返回: (源路径, 状态, 原始大小, 新大小, 详细信息)
+
+### ConfigManager (config.py)
+- load_history() / save_history() - 历史记录管理
+- load_cache() / save_cache() - 增量压缩缓存
+- is_file_processed() / mark_file_processed() - 文件处理状态
+
+## 开发注意事项
+
+1. **线程安全**: UI 更新必须通过信号，不要直接从工作线程操作 UI
+2. **异常处理**: 所有文件操作需要 try-except 保护
+3. **资源释放**: 线程和 worker 对象需要在 finished 信号中 deleteLater
+4. **路径处理**: 使用 pathlib.Path，避免字符串拼接路径
+
+## 最近修改记录
+
+- `71be911` - UI: 采用 Qt Fusion 风格 + 自定义深色调色板
+- `ca8b0f5` - UI: 移除标签页外边框
+- `93c3476` - UI: 采用 qdarkstyle 美化界面
+- `df7b286` - UI: 修复样式问题，采用 Material Design 深色主题
+- `30e8d87` - UI改进：醒目复选框、明确的历史记录标签、版本号标题
+- `c7fc7a6` - fix: 修复闪退问题（Path 导入缺失）
+- `ae22f16` - docs: 更新 README，添加 v1.1.0 新功能说明
+- `171b467` - v1.1.0: 新增8大功能
+- `fc35be3` - Initial commit: 图片批量压缩工具 v1.0.0
