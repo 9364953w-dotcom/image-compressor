@@ -12,8 +12,7 @@ from PyQt5.QtWidgets import (
     QGroupBox, QFormLayout, QComboBox, QLineEdit, QTableWidget,
     QTableWidgetItem, QHeaderView, QTabWidget, QSplitter,
     QAbstractItemView, QMenuBar, QMenu, QAction, QFrame,
-    QSizePolicy, QSpacerItem, QStackedWidget, QToolButton,
-    QScrollArea
+    QSizePolicy, QSpacerItem, QScrollArea
 )
 from PyQt5.QtCore import Qt, QThread, QSize
 from PyQt5.QtGui import QFont, QColor, QPalette, QIcon
@@ -154,7 +153,7 @@ class MainWindow(QWidget):
                 border-color: {self.TEXT_SECONDARY};
             }}
             
-            /* 复选框 */
+            /* 复选框 - VS Code 风格 */
             QCheckBox {{
                 color: {self.TEXT_PRIMARY};
                 font-size: 13px;
@@ -171,9 +170,8 @@ class MainWindow(QWidget):
             }}
             
             QCheckBox::indicator:checked {{
-                background-color: {self.BUTTON_BG};
-                border-color: {self.BUTTON_BG};
-                image: url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAiIGhlaWdodD0iMTAiIHZpZXdCb3g9IjAgMCAxMCAxMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNOCAyTDQgN0wyIDUiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PC9zdmc+);
+                background-color: {self.ACCENT};
+                border-color: {self.ACCENT};
             }}
             
             QCheckBox::indicator:hover {{
@@ -214,6 +212,10 @@ class MainWindow(QWidget):
             
             QSlider::sub-page:horizontal {{
                 background-color: {self.ACCENT};
+            }}
+            
+            QSlider::add-page:horizontal {{
+                background-color: {self.BORDER};
             }}
             
             QSlider::handle:horizontal {{
@@ -282,7 +284,7 @@ class MainWindow(QWidget):
                 border: 1px solid {self.BORDER};
                 border-radius: 0px;
                 text-align: center;
-                height: 18px;
+                height: 22px;
                 color: {self.TEXT_PRIMARY};
                 font-size: 11px;
             }}
@@ -423,20 +425,20 @@ class MainWindow(QWidget):
         """)
     
     def _setup_ui(self):
-        """设置用户界面 - VS Code 风格三栏布局"""
+        """设置用户界面 - VS Code 风格"""
         main_layout = QHBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
         
-        # ========== 左侧边栏 ==========
+        # ========== 左侧边栏 (1/3) ==========
         left_sidebar = QWidget()
-        left_sidebar.setFixedWidth(250)
+        left_sidebar.setFixedWidth(400)
         left_sidebar.setStyleSheet(f"background-color: {self.BG_SECONDARY}; border-right: 1px solid {self.BORDER};")
         left_layout = QVBoxLayout(left_sidebar)
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.setSpacing(0)
         
-        # 标题
+        # 标题栏
         header = QWidget()
         header.setStyleSheet(f"background-color: {self.BG_SECONDARY}; border-bottom: 1px solid {self.BORDER};")
         header_layout = QHBoxLayout(header)
@@ -458,7 +460,7 @@ class MainWindow(QWidget):
         scroll_layout.setContentsMargins(12, 12, 12, 12)
         scroll_layout.setSpacing(16)
         
-        # 输入输出组
+        # ===== 输入输出组 =====
         io_group = self._create_vscode_group("输入输出")
         io_layout = QVBoxLayout(io_group)
         io_layout.setSpacing(8)
@@ -474,7 +476,7 @@ class MainWindow(QWidget):
         input_row.addWidget(self.input_edit)
         
         browse_input = QPushButton("...")
-        browse_input.setFixedWidth(32)
+        browse_input.setFixedWidth(28)
         browse_input.setToolTip("浏览")
         browse_input.clicked.connect(self._select_input)
         browse_input.setObjectName("secondaryBtn")
@@ -492,7 +494,7 @@ class MainWindow(QWidget):
         output_row.addWidget(self.output_edit)
         
         browse_output = QPushButton("...")
-        browse_output.setFixedWidth(32)
+        browse_output.setFixedWidth(28)
         browse_output.setToolTip("浏览")
         browse_output.clicked.connect(self._select_output)
         browse_output.setObjectName("secondaryBtn")
@@ -511,7 +513,7 @@ class MainWindow(QWidget):
         
         scroll_layout.addWidget(io_group)
         
-        # 预设组
+        # ===== 预设配置组 =====
         preset_group = self._create_vscode_group("预设配置")
         preset_layout = QVBoxLayout(preset_group)
         preset_layout.setSpacing(8)
@@ -534,66 +536,36 @@ class MainWindow(QWidget):
         preset_layout.addWidget(self.preset_desc_label)
         
         scroll_layout.addWidget(preset_group)
-        scroll_layout.addStretch()
         
-        scroll.setWidget(scroll_content)
-        left_layout.addWidget(scroll)
-        
-        main_layout.addWidget(left_sidebar)
-        
-        # ========== 中间主区域 ==========
-        center_panel = QWidget()
-        center_layout = QVBoxLayout(center_panel)
-        center_layout.setContentsMargins(20, 16, 20, 16)
-        center_layout.setSpacing(16)
-        
-        # 顶部标题栏
-        top_bar = QWidget()
-        top_layout = QHBoxLayout(top_bar)
-        top_layout.setContentsMargins(0, 0, 0, 0)
-        
-        title = QLabel(f"{APP_NAME}  v{__version__}")
-        title.setStyleSheet(f"color: {self.TEXT_ACTIVE}; font-size: 18px; font-weight: 600;")
-        top_layout.addWidget(title)
-        
-        top_layout.addStretch()
-        
-        about_btn = QPushButton("关于")
-        about_btn.setFixedWidth(60)
-        about_btn.setObjectName("secondaryBtn")
-        about_btn.clicked.connect(self._show_about)
-        top_layout.addWidget(about_btn)
-        
-        center_layout.addWidget(top_bar)
-        
-        # 输出设置组
+        # ===== 输出设置组（左侧）=====
         settings_group = self._create_vscode_group("输出设置")
         settings_layout = QVBoxLayout(settings_group)
-        settings_layout.setSpacing(12)
+        settings_layout.setSpacing(10)
         
-        # 第一行：格式和最小大小
-        row1 = QHBoxLayout()
-        row1.addWidget(QLabel("输出格式:"))
+        # 输出格式
+        format_row = QHBoxLayout()
+        format_row.addWidget(QLabel("输出格式:"))
         self.format_combo = QComboBox()
         self.format_combo.addItems(["保持原格式", "JPG", "PNG", "WebP"])
-        self.format_combo.setFixedWidth(120)
-        row1.addWidget(self.format_combo)
+        self.format_combo.setFixedWidth(110)
+        format_row.addWidget(self.format_combo)
+        format_row.addStretch()
+        settings_layout.addLayout(format_row)
         
-        row1.addSpacing(30)
-        
-        row1.addWidget(QLabel("最小大小:"))
+        # 最小大小
+        minsize_row = QHBoxLayout()
+        minsize_row.addWidget(QLabel("最小大小:"))
         self.min_size_spin = QDoubleSpinBox()
         self.min_size_spin.setRange(0, 100)
         self.min_size_spin.setDecimals(1)
         self.min_size_spin.setValue(DEFAULT_MIN_SIZE_MB)
         self.min_size_spin.setSuffix(" MB")
-        self.min_size_spin.setFixedWidth(100)
-        row1.addWidget(self.min_size_spin)
-        row1.addStretch()
+        self.min_size_spin.setFixedWidth(90)
+        minsize_row.addWidget(self.min_size_spin)
+        minsize_row.addStretch()
+        settings_layout.addLayout(minsize_row)
         
-        settings_layout.addLayout(row1)
-        
-        # 第二行：压缩质量
+        # 压缩质量
         quality_row = QHBoxLayout()
         quality_row.addWidget(QLabel("压缩质量:"))
         
@@ -606,32 +578,32 @@ class MainWindow(QWidget):
         self.quality_spin.setRange(1, 100)
         self.quality_spin.setValue(DEFAULT_QUALITY)
         self.quality_spin.setSuffix("%")
-        self.quality_spin.setFixedWidth(60)
+        self.quality_spin.setFixedWidth(50)
         quality_row.addWidget(self.quality_spin)
         
         settings_layout.addLayout(quality_row)
         
-        # 第三行：尺寸调整
+        # 尺寸调整
         resize_row = QHBoxLayout()
         self.resize_cb = QCheckBox("调整尺寸")
         self.resize_cb.stateChanged.connect(self._on_resize_toggled)
         resize_row.addWidget(self.resize_cb)
         
-        resize_row.addWidget(QLabel("最大宽:"))
+        resize_row.addWidget(QLabel("宽:"))
         self.max_width_spin = QSpinBox()
         self.max_width_spin.setRange(0, 10000)
         self.max_width_spin.setValue(0)
         self.max_width_spin.setSuffix(" px")
-        self.max_width_spin.setFixedWidth(80)
+        self.max_width_spin.setFixedWidth(70)
         self.max_width_spin.setEnabled(False)
         resize_row.addWidget(self.max_width_spin)
         
-        resize_row.addWidget(QLabel("最大高:"))
+        resize_row.addWidget(QLabel("高:"))
         self.max_height_spin = QSpinBox()
         self.max_height_spin.setRange(0, 10000)
         self.max_height_spin.setValue(0)
         self.max_height_spin.setSuffix(" px")
-        self.max_height_spin.setFixedWidth(80)
+        self.max_height_spin.setFixedWidth(70)
         self.max_height_spin.setEnabled(False)
         resize_row.addWidget(self.max_height_spin)
         
@@ -643,25 +615,25 @@ class MainWindow(QWidget):
         
         settings_layout.addLayout(resize_row)
         
-        # 第四行：智能压缩
+        # 智能压缩
         smart_row = QHBoxLayout()
         self.smart_cb = QCheckBox("智能压缩")
         self.smart_cb.stateChanged.connect(self._on_smart_toggled)
         smart_row.addWidget(self.smart_cb)
         
-        smart_row.addWidget(QLabel("目标大小:"))
+        smart_row.addWidget(QLabel("目标:"))
         self.target_size_spin = QSpinBox()
         self.target_size_spin.setRange(10, 10000)
         self.target_size_spin.setValue(200)
         self.target_size_spin.setSuffix(" KB")
-        self.target_size_spin.setFixedWidth(80)
+        self.target_size_spin.setFixedWidth(70)
         self.target_size_spin.setEnabled(False)
         smart_row.addWidget(self.target_size_spin)
         smart_row.addStretch()
         
         settings_layout.addLayout(smart_row)
         
-        # 第五行：EXIF 选项
+        # EXIF 选项
         exif_row = QHBoxLayout()
         self.keep_exif_cb = QCheckBox("保留 EXIF")
         self.keep_exif_cb.setChecked(True)
@@ -670,28 +642,59 @@ class MainWindow(QWidget):
         self.auto_rotate_cb = QCheckBox("自动旋转")
         self.auto_rotate_cb.setChecked(True)
         exif_row.addWidget(self.auto_rotate_cb)
-        
-        exif_btn = QPushButton("查看 EXIF")
-        exif_btn.setFixedWidth(80)
-        exif_btn.setObjectName("secondaryBtn")
-        exif_btn.clicked.connect(self._show_exif)
-        exif_row.addWidget(exif_btn)
         exif_row.addStretch()
         
         settings_layout.addLayout(exif_row)
         
-        center_layout.addWidget(settings_group)
+        scroll_layout.addWidget(settings_group)
+        scroll_layout.addStretch()
         
-        # 预览组
+        scroll.setWidget(scroll_content)
+        left_layout.addWidget(scroll)
+        
+        main_layout.addWidget(left_sidebar)
+        
+        # ========== 右侧主区域 (2/3) ==========
+        right_panel = QWidget()
+        right_layout = QVBoxLayout(right_panel)
+        right_layout.setContentsMargins(20, 16, 20, 16)
+        right_layout.setSpacing(16)
+        
+        # 顶部标题栏
+        top_bar = QWidget()
+        top_layout = QHBoxLayout(top_bar)
+        top_layout.setContentsMargins(0, 0, 0, 0)
+        
+        title = QLabel(f"{APP_NAME}  v{__version__}")
+        title.setStyleSheet(f"color: {self.TEXT_ACTIVE}; font-size: 20px; font-weight: 600;")
+        top_layout.addWidget(title)
+        
+        top_layout.addStretch()
+        
+        about_btn = QPushButton("关于")
+        about_btn.setFixedWidth(60)
+        about_btn.setObjectName("secondaryBtn")
+        about_btn.clicked.connect(self._show_about)
+        top_layout.addWidget(about_btn)
+        
+        right_layout.addWidget(top_bar)
+        
+        # 压缩预览组
         preview_group = self._create_vscode_group("压缩预览")
         preview_layout = QVBoxLayout(preview_group)
-        preview_layout.setSpacing(10)
+        preview_layout.setSpacing(12)
         
         preview_btn_row = QHBoxLayout()
         self.preview_btn = QPushButton("预览第一张图片")
         self.preview_btn.setFixedWidth(140)
         self.preview_btn.clicked.connect(self._preview_compression)
         preview_btn_row.addWidget(self.preview_btn)
+        
+        exif_btn = QPushButton("查看 EXIF")
+        exif_btn.setFixedWidth(90)
+        exif_btn.setObjectName("secondaryBtn")
+        exif_btn.clicked.connect(self._show_exif)
+        preview_btn_row.addWidget(exif_btn)
         preview_btn_row.addStretch()
         preview_layout.addLayout(preview_btn_row)
         
@@ -700,7 +703,9 @@ class MainWindow(QWidget):
         self.preview_original_label.setStyleSheet(f"color: {self.TEXT_SECONDARY};")
         preview_info.addWidget(self.preview_original_label)
         
-        preview_info.addWidget(QLabel("→", styleSheet=f"color: {self.ACCENT};"))
+        arrow = QLabel("→")
+        arrow.setStyleSheet(f"color: {self.ACCENT}; padding: 0 8px;")
+        preview_info.addWidget(arrow)
         
         self.preview_compressed_label = QLabel("压缩后: -")
         self.preview_compressed_label.setStyleSheet(f"color: {self.TEXT_ACTIVE};")
@@ -714,12 +719,12 @@ class MainWindow(QWidget):
         preview_info.addStretch()
         
         preview_layout.addLayout(preview_info)
-        center_layout.addWidget(preview_group)
+        right_layout.addWidget(preview_group)
         
         # 操作组
         action_group = self._create_vscode_group("操作")
         action_layout = QVBoxLayout(action_group)
-        action_layout.setSpacing(10)
+        action_layout.setSpacing(12)
         
         # 选项
         options_row = QHBoxLayout()
@@ -756,7 +761,7 @@ class MainWindow(QWidget):
         
         self.start_btn = QPushButton("开始压缩")
         self.start_btn.setDefault(True)
-        self.start_btn.setMinimumWidth(100)
+        self.start_btn.setMinimumWidth(120)
         self.start_btn.clicked.connect(self._start_compression)
         btn_row.addWidget(self.start_btn, 1)
         
@@ -768,14 +773,12 @@ class MainWindow(QWidget):
         self.export_btn.clicked.connect(self._export_stats)
         action_layout.addWidget(self.export_btn)
         
-        center_layout.addWidget(action_group)
-        center_layout.addStretch()
+        right_layout.addWidget(action_group)
+        right_layout.addStretch()
         
-        main_layout.addWidget(center_panel, 1)
-        
-        # ========== 底部面板（日志区）==========
+        # 底部面板（日志区）
         bottom_panel = QWidget()
-        bottom_panel.setFixedHeight(200)
+        bottom_panel.setFixedHeight(220)
         bottom_panel.setStyleSheet(f"background-color: {self.BG_PRIMARY}; border-top: 1px solid {self.BORDER};")
         bottom_layout = QVBoxLayout(bottom_panel)
         bottom_layout.setContentsMargins(0, 0, 0, 0)
@@ -784,13 +787,13 @@ class MainWindow(QWidget):
         self.tab_widget = QTabWidget()
         self.tab_widget.setDocumentMode(True)
         
-        # 日志标签页
+        # 输出标签页
         self.log_text = QTextEdit()
         self.log_text.setReadOnly(True)
         self.log_text.setPlaceholderText("等待开始...")
         self.tab_widget.addTab(self.log_text, "输出")
         
-        # 详细统计标签页
+        # 统计标签页
         self.stats_table = QTableWidget()
         self.stats_table.setColumnCount(7)
         self.stats_table.setHorizontalHeaderLabels([
@@ -803,15 +806,32 @@ class MainWindow(QWidget):
         
         bottom_layout.addWidget(self.tab_widget)
         
-        # 将底部面板添加到主布局
-        main_container = QWidget()
-        main_container_layout = QVBoxLayout(main_container)
-        main_container_layout.setContentsMargins(0, 0, 0, 0)
-        main_container_layout.setSpacing(0)
-        main_container_layout.addWidget(center_panel, 1)
-        main_container_layout.addWidget(bottom_panel)
+        # 组装右侧面板
+        right_container = QWidget()
+        right_container_layout = QVBoxLayout(right_container)
+        right_container_layout.setContentsMargins(0, 0, 0, 0)
+        right_container_layout.setSpacing(16)
         
-        main_layout.addWidget(main_container, 1)
+        # 可滚动的主内容区
+        right_scroll = QScrollArea()
+        right_scroll.setWidgetResizable(True)
+        right_scroll.setFrameShape(QFrame.NoFrame)
+        right_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        
+        right_content = QWidget()
+        right_content_layout = QVBoxLayout(right_content)
+        right_content_layout.setContentsMargins(0, 0, 0, 0)
+        right_content_layout.setSpacing(16)
+        right_content_layout.addWidget(top_bar)
+        right_content_layout.addWidget(preview_group)
+        right_content_layout.addWidget(action_group)
+        right_content_layout.addStretch()
+        
+        right_scroll.setWidget(right_content)
+        right_container_layout.addWidget(right_scroll, 1)
+        right_container_layout.addWidget(bottom_panel)
+        
+        main_layout.addWidget(right_container, 2)
     
     def _create_vscode_group(self, title):
         """创建 VS Code 风格的分组"""
@@ -1104,8 +1124,8 @@ class MainWindow(QWidget):
             self.stats_table.setItem(i, 4, QTableWidgetItem(format_bytes(new_size)))
             
             savings = orig_size - new_size
-            savings_percent = (savings / orig_size * 100) if orig_size > 0 else 0
-            self.stats_table.setItem(i, 5, QTableWidgetItem(f"{format_bytes(savings)} ({savings_percent:.1f}%)"))
+            savings_pct = (savings / orig_size * 100) if orig_size > 0 else 0
+            self.stats_table.setItem(i, 5, QTableWidgetItem(f"{format_bytes(savings)} ({savings_pct:.1f}%)"))
             
             dim_change = details.get('dimensions', '-')
             self.stats_table.setItem(i, 6, QTableWidgetItem(dim_change))
