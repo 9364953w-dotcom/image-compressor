@@ -1,18 +1,14 @@
-name: Build Executables
+name: Build and Release
 
 on:
   push:
-    branches: [ main ]
     tags:
       - 'v*'
-  pull_request:
-    branches: [ main ]
   workflow_dispatch:
 
 jobs:
   build-macos:
     runs-on: macos-latest
-    timeout-minutes: 30
     steps:
     - name: Checkout
       uses: actions/checkout@v4
@@ -38,20 +34,19 @@ jobs:
           --noconfirm \
           src/__main__.py
     
-    - name: Rename App
+    - name: Create ZIP
       run: |
-        mv "dist/ImageCompressor.app" "dist/图片压缩工具.app"
+        cd dist
+        zip -r "ImageCompressor-macOS.zip" "ImageCompressor.app"
     
     - name: Upload macOS Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: macos-app
-        path: dist/图片压缩工具.app
-        retention-days: 30
+        name: macos-build
+        path: dist/ImageCompressor-macOS.zip
 
   build-windows:
     runs-on: windows-latest
-    timeout-minutes: 30
     steps:
     - name: Checkout
       uses: actions/checkout@v4
@@ -77,45 +72,43 @@ jobs:
           --noconfirm `
           src/__main__.py
     
-    - name: Rename EXE folder
-      run: |
-        Rename-Item -Path "dist/ImageCompressor" -NewName "图片压缩工具"
-    
     - name: Create ZIP
       run: |
-        Compress-Archive -Path "dist/图片压缩工具" -DestinationPath "dist/图片压缩工具-Windows.zip"
+        cd dist
+        Rename-Item -Path "ImageCompressor" -NewName "图片压缩工具"
+        Compress-Archive -Path "图片压缩工具" -DestinationPath "ImageCompressor-Windows.zip"
     
     - name: Upload Windows Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: windows-exe
-        path: dist/图片压缩工具-Windows.zip
-        retention-days: 30
+        name: windows-build
+        path: dist/ImageCompressor-Windows.zip
 
-  create-release:
+  release:
     needs: [build-macos, build-windows]
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
     steps:
     - name: Download macOS Artifact
       uses: actions/download-artifact@v4
       with:
-        name: macos-app
-        path: ./macos
+        name: macos-build
     
     - name: Download Windows Artifact
       uses: actions/download-artifact@v4
       with:
-        name: windows-exe
-        path: ./windows
+        name: windows-build
+    
+    - name: List files
+      run: ls -la
     
     - name: Create Release
-      uses: softprops/action-gh-release@v2
+      uses: softprops/action-gh-release@v1
       with:
         files: |
-          ./windows/图片压缩工具-Windows.zip
-        fail_on_unmatched_paths: false
+          ImageCompressor-macOS.zip
+          ImageCompressor-Windows.zip
         generate_release_notes: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
