@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Dict, List, Any
 
 # 版本信息
-__version__ = "1.2.0"
+__version__ = "1.3.0"
 APP_NAME = "图片批量压缩工具"
 BUNDLE_ID = "com.wang.imagecompressor"
 
@@ -46,6 +46,7 @@ MAX_HISTORY_ITEMS = 10
 
 # 预设配置
 PRESETS_FILE = ".presets.json"
+UI_SETTINGS_FILE = ".ui_settings.json"
 DEFAULT_PRESETS = [
     {
         "name": "网页用",
@@ -132,6 +133,7 @@ class ConfigManager:
         self.config_dir.mkdir(exist_ok=True)
         self.history_file = self.config_dir / HISTORY_FILE
         self.cache_file = self.config_dir / CACHE_FILE
+        self.ui_settings_file = self.config_dir / UI_SETTINGS_FILE
     
     def load_history(self) -> List[Dict[str, Any]]:
         """加载历史记录"""
@@ -286,6 +288,26 @@ class ConfigManager:
             return True
         except Exception:
             return False
+
+    # ========== UI 偏好 ==========
+
+    def load_ui_settings(self) -> Dict[str, Any]:
+        """加载 UI 偏好配置"""
+        if not self.ui_settings_file.exists():
+            return {}
+        try:
+            with open(self.ui_settings_file, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+
+    def save_ui_settings(self, settings: Dict[str, Any]) -> None:
+        """保存 UI 偏好配置"""
+        try:
+            with open(self.ui_settings_file, "w", encoding="utf-8") as f:
+                json.dump(settings, f, ensure_ascii=False, indent=2)
+        except Exception:
+            pass
 
 
 # 全局配置管理器实例

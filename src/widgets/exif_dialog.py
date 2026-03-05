@@ -1,5 +1,5 @@
 """
-EXIF 信息查看对话框 - 现代深色玻璃拟态风格
+EXIF 信息查看对话框 - 与主程序一致的深色风格
 """
 
 from PyQt5.QtWidgets import (
@@ -12,7 +12,7 @@ from PyQt5.QtGui import QFont
 
 
 class ExifDialog(QDialog):
-    """EXIF 信息查看对话框 - 现代风格"""
+    """EXIF 信息查看对话框"""
     
     def __init__(self, exif_data: dict, image_info: dict, parent=None):
         super().__init__(parent)
@@ -24,138 +24,115 @@ class ExifDialog(QDialog):
         self.setMinimumSize(600, 700)
         self.resize(700, 750)
         
-        # 应用样式
+        # 与主程序保持一致的深色样式
         self.setStyleSheet("""
             QDialog {
-                background-color: #0d0d12;
+                background-color: #1f1f1f;
             }
             
             QGroupBox {
-                background-color: rgba(30, 30, 40, 0.6);
-                border: 1px solid rgba(255, 255, 255, 0.08);
-                border-radius: 16px;
-                margin-top: 12px;
-                padding: 20px;
+                background-color: #2a2a2a;
+                border: 1px solid #4a4a4a;
+                border-radius: 6px;
+                margin-top: 10px;
+                padding: 10px;
                 font-weight: 600;
             }
             
             QGroupBox::title {
-                color: #a29bfe;
+                color: #b5b5b5;
                 subcontrol-origin: margin;
-                left: 20px;
-                padding: 0 10px;
-                font-size: 13px;
-                text-transform: uppercase;
-                letter-spacing: 1px;
+                left: 10px;
+                padding: 0 4px;
+                font-size: 12px;
             }
             
             QLabel {
-                color: #e8e8ed;
+                color: #f2f2f2;
             }
             
             QLabel#titleLabel {
-                color: #ffffff;
-                font-size: 18px;
+                color: #f2f2f2;
+                font-size: 16px;
                 font-weight: 700;
             }
             
             QLabel#valueLabel {
-                color: #a29bfe;
+                color: #f39c12;
                 font-weight: 500;
             }
             
             QTableWidget {
-                background-color: rgba(30, 30, 40, 0.4);
-                border: 1px solid rgba(255, 255, 255, 0.08);
-                border-radius: 12px;
-                gridline-color: rgba(255, 255, 255, 0.05);
-                selection-background-color: rgba(108, 92, 231, 0.3);
-                selection-color: #ffffff;
+                background-color: #333333;
+                border: 1px solid #4a4a4a;
+                border-radius: 4px;
+                gridline-color: #4a4a4a;
+                selection-background-color: #4a4a4a;
+                selection-color: #f2f2f2;
             }
             
             QTableWidget::item {
-                padding: 10px;
-                color: #e8e8ed;
-                border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-            }
-            
-            QTableWidget::item:selected {
-                background-color: rgba(108, 92, 231, 0.3);
+                padding: 6px;
+                color: #f2f2f2;
             }
             
             QHeaderView::section {
-                background: rgba(30, 30, 40, 0.8);
-                color: #a29bfe;
-                padding: 12px;
-                border: none;
+                background: #2a2a2a;
+                color: #b5b5b5;
+                padding: 6px;
+                border: 1px solid #4a4a4a;
                 font-weight: 600;
                 font-size: 12px;
-                text-transform: uppercase;
-                letter-spacing: 1px;
-            }
-            
-            QHeaderView::section:first {
-                border-top-left-radius: 12px;
-            }
-            
-            QHeaderView::section:last {
-                border-top-right-radius: 12px;
             }
             
             QTextEdit {
-                background-color: rgba(20, 20, 28, 0.6);
-                border: 1px solid rgba(255, 255, 255, 0.08);
-                border-radius: 12px;
-                padding: 16px;
-                color: #e8e8ed;
-                font-family: 'JetBrains Mono', monospace;
+                background-color: #333333;
+                border: 1px solid #4a4a4a;
+                border-radius: 4px;
+                padding: 8px;
+                color: #f2f2f2;
+                font-family: 'Consolas', 'Monaco', monospace;
                 font-size: 12px;
-                line-height: 1.6;
             }
             
             QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #6c5ce7, stop:1 #a29bfe);
-                color: white;
-                border: none;
-                border-radius: 12px;
-                padding: 12px 24px;
+                background-color: #333333;
+                color: #f2f2f2;
+                border: 1px solid #4a4a4a;
+                border-radius: 4px;
+                padding: 6px 12px;
                 font-weight: 600;
             }
             
             QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #7d6cf0, stop:1 #b3acff);
+                background-color: #4a4a4a;
             }
             
             QPushButton#secondaryBtn {
-                background: rgba(255, 255, 255, 0.08);
-                border: 1px solid rgba(255, 255, 255, 0.15);
+                background-color: #333333;
             }
             
             QPushButton#secondaryBtn:hover {
-                background: rgba(255, 255, 255, 0.12);
+                background-color: #4a4a4a;
             }
             
             QTabWidget::pane {
-                border: none;
-                background-color: transparent;
+                border: 1px solid #4a4a4a;
+                background-color: #2a2a2a;
             }
             
             QTabBar::tab {
-                background-color: rgba(255, 255, 255, 0.05);
-                color: #8b8b9b;
-                padding: 10px 20px;
-                margin-right: 8px;
-                border-radius: 10px;
-                border: none;
+                background-color: #333333;
+                color: #b5b5b5;
+                padding: 8px 14px;
+                margin-right: 2px;
+                border: 1px solid #4a4a4a;
             }
             
             QTabBar::tab:selected {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 rgba(108, 92, 231, 0.3), stop:1 rgba(162, 155, 254, 0.3));
-                color: #ffffff;
-                border: 1px solid rgba(162, 155, 254, 0.3);
+                background-color: #2a2a2a;
+                color: #f2f2f2;
+                border-bottom: 2px solid #f39c12;
             }
         """)
         
@@ -168,13 +145,13 @@ class ExifDialog(QDialog):
         layout.setContentsMargins(24, 24, 24, 24)
         
         # ========== 标题 ==========
-        title_label = QLabel("📷 EXIF 信息")
+        title_label = QLabel("EXIF 信息")
         title_label.setObjectName("titleLabel")
         layout.addWidget(title_label)
         
         # ========== 基本信息卡片 ==========
         if self.image_info:
-            info_group = QGroupBox("📊 基本信息")
+            info_group = QGroupBox("基本信息")
             info_layout = QVBoxLayout(info_group)
             
             # 信息网格
@@ -237,19 +214,19 @@ class ExifDialog(QDialog):
         
         # --- 基本信息页 ---
         basic_tab = self._create_basic_tab()
-        tab_widget.addTab(basic_tab, "📋 基本信息")
+        tab_widget.addTab(basic_tab, "基本信息")
         
         # --- 拍摄信息页 ---
         camera_tab = self._create_camera_tab()
-        tab_widget.addTab(camera_tab, "📸 拍摄信息")
+        tab_widget.addTab(camera_tab, "拍摄信息")
         
         # --- GPS 信息页 ---
         gps_tab = self._create_gps_tab()
-        tab_widget.addTab(gps_tab, "🌍 位置信息")
+        tab_widget.addTab(gps_tab, "位置信息")
         
         # --- 完整 EXIF 页 ---
         raw_tab = self._create_raw_tab()
-        tab_widget.addTab(raw_tab, "📝 原始数据")
+        tab_widget.addTab(raw_tab, "原始数据")
         
         layout.addWidget(tab_widget)
         
@@ -257,7 +234,7 @@ class ExifDialog(QDialog):
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
         
-        copy_btn = QPushButton("📋 复制")
+        copy_btn = QPushButton("复制")
         copy_btn.setObjectName("secondaryBtn")
         copy_btn.clicked.connect(self._copy_to_clipboard)
         btn_layout.addWidget(copy_btn)
@@ -322,9 +299,14 @@ class ExifDialog(QDialog):
             basic_info.append(("图像描述", self.exif_data['ImageDescription']))
         
         table.setRowCount(len(basic_info))
-        for i, (key, value) in enumerate(basic_info):
-            table.setItem(i, 0, QTableWidgetItem(key))
-            table.setItem(i, 1, QTableWidgetItem(str(value)))
+        if not basic_info:
+            table.setRowCount(1)
+            table.setItem(0, 0, QTableWidgetItem("提示"))
+            table.setItem(0, 1, QTableWidgetItem("未读取到基础 EXIF 信息"))
+        else:
+            for i, (key, value) in enumerate(basic_info):
+                table.setItem(i, 0, QTableWidgetItem(key))
+                table.setItem(i, 1, QTableWidgetItem(str(value)))
         
         layout.addWidget(table)
         return tab
@@ -408,9 +390,14 @@ class ExifDialog(QDialog):
             camera_info.append(("曝光程序", self.exif_data['ExposureProgram']))
         
         table.setRowCount(len(camera_info))
-        for i, (key, value) in enumerate(camera_info):
-            table.setItem(i, 0, QTableWidgetItem(key))
-            table.setItem(i, 1, QTableWidgetItem(str(value)))
+        if not camera_info:
+            table.setRowCount(1)
+            table.setItem(0, 0, QTableWidgetItem("提示"))
+            table.setItem(0, 1, QTableWidgetItem("未读取到拍摄参数（可能无 EXIF）"))
+        else:
+            for i, (key, value) in enumerate(camera_info):
+                table.setItem(i, 0, QTableWidgetItem(key))
+                table.setItem(i, 1, QTableWidgetItem(str(value)))
         
         layout.addWidget(table)
         return tab

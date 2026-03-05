@@ -186,7 +186,7 @@ def get_exif_info(src_path: Path) -> Dict[str, Any]:
                 return info
             
             info["has_exif"] = True
-            info["raw"] = {TAGS.get(tag, tag): str(value) for tag, value in exif.items()}
+            info["raw"] = {TAGS.get(tag, tag): value for tag, value in exif.items()}
             
             # 相机信息
             make = exif.get(0x010f, "")
