@@ -71,33 +71,34 @@ class MainWindow(QWidget):
             
             /* 玻璃拟态卡片 */
             QGroupBox {
-                background-color: rgba(30, 30, 40, 0.6);
+                background-color: rgba(30, 30, 40, 0.5);
                 border: 1px solid rgba(255, 255, 255, 0.08);
-                border-radius: 16px;
-                margin-top: 12px;
-                padding: 20px;
+                border-radius: 14px;
+                margin-top: 10px;
+                padding: 16px;
                 font-weight: 600;
             }
             
             QGroupBox::title {
                 color: #a29bfe;
                 subcontrol-origin: margin;
-                left: 20px;
-                padding: 0 10px;
-                font-size: 14px;
+                left: 16px;
+                padding: 0 8px;
+                font-size: 13px;
                 text-transform: uppercase;
-                letter-spacing: 1px;
+                letter-spacing: 0.5px;
             }
             
             /* 输入框 - 深色玻璃 */
             QLineEdit {
                 background-color: rgba(20, 20, 28, 0.8);
                 border: 1px solid rgba(255, 255, 255, 0.1);
-                border-radius: 12px;
-                padding: 12px 16px;
+                border-radius: 10px;
+                padding: 10px 14px;
                 color: #ffffff;
-                font-size: 14px;
+                font-size: 13px;
                 selection-background-color: #6c5ce7;
+                min-height: 20px;
             }
             
             QLineEdit:focus {
@@ -106,7 +107,7 @@ class MainWindow(QWidget):
             }
             
             QLineEdit::placeholder {
-                color: #6b6b7b;
+                color: #5a5a6a;
             }
             
             /* 按钮 - 渐变风格 */
@@ -115,10 +116,11 @@ class MainWindow(QWidget):
                     stop:0 #6c5ce7, stop:1 #a29bfe);
                 color: white;
                 border: none;
-                border-radius: 12px;
-                padding: 12px 24px;
+                border-radius: 10px;
+                padding: 10px 20px;
                 font-weight: 600;
                 font-size: 13px;
+                min-height: 36px;
             }
             
             QPushButton:hover {
@@ -140,36 +142,38 @@ class MainWindow(QWidget):
             QPushButton#secondaryBtn {
                 background: rgba(255, 255, 255, 0.08);
                 border: 1px solid rgba(255, 255, 255, 0.15);
+                color: #e8e8ed;
             }
             
             QPushButton#secondaryBtn:hover {
-                background: rgba(255, 255, 255, 0.12);
+                background: rgba(255, 255, 255, 0.15);
                 border-color: rgba(255, 255, 255, 0.25);
+                color: #ffffff;
             }
             
             /* 复选框 */
             QCheckBox {
-                spacing: 10px;
+                spacing: 8px;
                 color: #e8e8ed;
                 font-size: 13px;
             }
             
             QCheckBox::indicator {
-                width: 22px;
-                height: 22px;
-                border-radius: 6px;
-                border: 2px solid rgba(255, 255, 255, 0.2);
-                background-color: rgba(20, 20, 28, 0.8);
+                width: 18px;
+                height: 18px;
+                border-radius: 5px;
+                border: 2px solid rgba(255, 255, 255, 0.25);
+                background-color: rgba(20, 20, 28, 0.6);
             }
             
             QCheckBox::indicator:checked {
-                background-color: #6c5ce7;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #6c5ce7, stop:1 #a29bfe);
                 border-color: #6c5ce7;
-                image: url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iMTIiIHZpZXdCb3g9IjAgMCAxMiAxMiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMTAgM0w0LjUgOC41IDIgNiIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz48L3N2Zz4=);
             }
             
             QCheckBox::indicator:hover {
-                border-color: rgba(108, 92, 231, 0.5);
+                border-color: rgba(108, 92, 231, 0.6);
             }
             
             /* 下拉框 */
@@ -229,9 +233,10 @@ class MainWindow(QWidget):
             QSpinBox, QDoubleSpinBox {
                 background-color: rgba(20, 20, 28, 0.8);
                 border: 1px solid rgba(255, 255, 255, 0.1);
-                border-radius: 10px;
-                padding: 8px 12px;
+                border-radius: 8px;
+                padding: 6px 10px;
                 color: #ffffff;
+                min-height: 20px;
             }
             
             QSpinBox::up-button, QDoubleSpinBox::up-button,
@@ -250,16 +255,18 @@ class MainWindow(QWidget):
             /* 进度条 */
             QProgressBar {
                 background-color: rgba(255, 255, 255, 0.08);
-                border-radius: 10px;
+                border-radius: 8px;
                 text-align: center;
-                height: 24px;
+                height: 20px;
                 border: none;
+                color: #e8e8ed;
+                font-size: 11px;
             }
             
             QProgressBar::chunk {
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
                     stop:0 #6c5ce7, stop:1 #a29bfe);
-                border-radius: 10px;
+                border-radius: 8px;
             }
             
             /* 标签页 */
@@ -441,9 +448,9 @@ class MainWindow(QWidget):
         header_layout.addStretch()
         
         # 右侧菜单按钮
-        about_btn = QPushButton("ℹ️ 关于")
+        about_btn = QPushButton("关于")
         about_btn.setObjectName("secondaryBtn")
-        about_btn.setFixedWidth(100)
+        about_btn.setFixedWidth(70)
         about_btn.clicked.connect(self._show_about)
         header_layout.addWidget(about_btn)
         
@@ -461,45 +468,58 @@ class MainWindow(QWidget):
         
         # 路径设置卡片
         path_card = QGroupBox("📁 输入输出")
-        path_layout = QFormLayout(path_card)
+        path_layout = QVBoxLayout(path_card)
         path_layout.setSpacing(12)
         
-        # 输入路径
-        self.input_edit = DragDropLineEdit()
-        self.input_edit.setPlaceholderText("拖拽或选择输入文件夹...")
-        self.input_edit.setMinimumHeight(44)
-        path_layout.addRow("输入文件夹", self.input_edit)
-        
-        browse_input = QPushButton("浏览")
-        browse_input.setFixedWidth(80)
-        browse_input.clicked.connect(self._select_input)
-        browse_input.setObjectName("secondaryBtn")
+        # 输入路径行
+        input_label = QLabel("输入文件夹")
+        input_label.setStyleSheet("color: #8b8b9b; font-size: 12px;")
+        path_layout.addWidget(input_label)
         
         input_row = QHBoxLayout()
+        self.input_edit = DragDropLineEdit()
+        self.input_edit.setPlaceholderText("拖拽或选择输入文件夹...")
+        self.input_edit.setMinimumHeight(36)
         input_row.addWidget(self.input_edit)
+        
+        browse_input = QPushButton("浏览")
+        browse_input.setFixedWidth(60)
+        browse_input.setMinimumWidth(50)
+        browse_input.clicked.connect(self._select_input)
+        browse_input.setObjectName("secondaryBtn")
         input_row.addWidget(browse_input)
-        path_layout.addRow("", input_row)
+        path_layout.addLayout(input_row)
         
-        # 输出路径
-        self.output_edit = DragDropLineEdit()
-        self.output_edit.setPlaceholderText("留空则覆盖原文件...")
-        self.output_edit.setMinimumHeight(44)
-        
-        browse_output = QPushButton("浏览")
-        browse_output.setFixedWidth(80)
-        browse_output.clicked.connect(self._select_output)
-        browse_output.setObjectName("secondaryBtn")
+        # 输出路径行
+        output_label = QLabel("输出文件夹")
+        output_label.setStyleSheet("color: #8b8b9b; font-size: 12px;")
+        path_layout.addWidget(output_label)
         
         output_row = QHBoxLayout()
+        self.output_edit = DragDropLineEdit()
+        self.output_edit.setPlaceholderText("留空则覆盖原文件...")
+        self.output_edit.setMinimumHeight(36)
         output_row.addWidget(self.output_edit)
-        output_row.addWidget(browse_output)
-        path_layout.addRow("输出文件夹", output_row)
         
-        # 历史记录
+        browse_output = QPushButton("浏览")
+        browse_output.setFixedWidth(60)
+        browse_output.setMinimumWidth(50)
+        browse_output.clicked.connect(self._select_output)
+        browse_output.setObjectName("secondaryBtn")
+        output_row.addWidget(browse_output)
+        path_layout.addLayout(output_row)
+        
+        # 历史记录行
+        history_row = QHBoxLayout()
+        history_label = QLabel("历史记录")
+        history_label.setStyleSheet("color: #8b8b9b; font-size: 12px;")
+        history_row.addWidget(history_label)
+        
         self.history_combo = QComboBox()
         self.history_combo.setPlaceholderText("选择历史记录...")
         self.history_combo.currentTextChanged.connect(self._on_history_selected)
-        path_layout.addRow("历史记录", self.history_combo)
+        history_row.addWidget(self.history_combo, 1)
+        path_layout.addLayout(history_row)
         
         left_layout.addWidget(path_card)
         
@@ -513,9 +533,10 @@ class MainWindow(QWidget):
         self.preset_combo.currentIndexChanged.connect(self._on_preset_selected)
         preset_row.addWidget(self.preset_combo)
         
-        save_preset_btn = QPushButton("💾 保存")
+        save_preset_btn = QPushButton("保存")
         save_preset_btn.setObjectName("secondaryBtn")
-        save_preset_btn.setFixedWidth(80)
+        save_preset_btn.setFixedWidth(60)
+        save_preset_btn.setMinimumWidth(50)
         save_preset_btn.clicked.connect(self._save_preset)
         preset_row.addWidget(save_preset_btn)
         
@@ -650,8 +671,9 @@ class MainWindow(QWidget):
         self.auto_rotate_cb.setChecked(True)
         exif_layout.addWidget(self.auto_rotate_cb)
         
-        exif_btn = QPushButton("📋 查看 EXIF")
+        exif_btn = QPushButton("查看 EXIF")
         exif_btn.setObjectName("secondaryBtn")
+        exif_btn.setFixedWidth(90)
         exif_btn.clicked.connect(self._show_exif)
         exif_layout.addWidget(exif_btn)
         exif_layout.addStretch()
@@ -665,7 +687,8 @@ class MainWindow(QWidget):
         preview_layout = QVBoxLayout(preview_card)
         
         preview_btn_row = QHBoxLayout()
-        self.preview_btn = QPushButton("🔍 预览第一张图片")
+        self.preview_btn = QPushButton("预览第一张图片")
+        self.preview_btn.setMinimumWidth(140)
         self.preview_btn.clicked.connect(self._preview_compression)
         preview_btn_row.addWidget(self.preview_btn)
         preview_btn_row.addStretch()
@@ -730,21 +753,48 @@ class MainWindow(QWidget):
         
         # 按钮行
         btn_row = QHBoxLayout()
+        btn_row.setSpacing(10)
         
-        self.cancel_btn = QPushButton("❌ 取消")
+        self.cancel_btn = QPushButton("取消")
         self.cancel_btn.setObjectName("secondaryBtn")
         self.cancel_btn.setEnabled(False)
         self.cancel_btn.clicked.connect(self._cancel_compression)
         btn_row.addWidget(self.cancel_btn)
         
-        self.start_btn = QPushButton("▶️ 开始压缩")
+        self.start_btn = QPushButton("开始压缩")
         self.start_btn.setDefault(True)
+        self.start_btn.setMinimumWidth(100)
+        self.start_btn.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #6c5ce7, stop:1 #a29bfe);
+                color: white;
+                border: none;
+                border-radius: 10px;
+                padding: 10px 20px;
+                font-weight: 600;
+                font-size: 14px;
+                min-height: 36px;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #7d6cf0, stop:1 #b3acff);
+            }
+            QPushButton:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #5b4dd6, stop:1 #918aff);
+            }
+            QPushButton:disabled {
+                background: #2a2a3a;
+                color: #5a5a6a;
+            }
+        """)
         self.start_btn.clicked.connect(self._start_compression)
         btn_row.addWidget(self.start_btn, 1)
         
         action_layout.addLayout(btn_row)
         
-        self.export_btn = QPushButton("📊 导出统计")
+        self.export_btn = QPushButton("导出统计")
         self.export_btn.setObjectName("secondaryBtn")
         self.export_btn.setEnabled(False)
         self.export_btn.clicked.connect(self._export_stats)
