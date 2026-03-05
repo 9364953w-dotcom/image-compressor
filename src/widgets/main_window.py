@@ -1,5 +1,5 @@
 """
-主窗口模块 - VS Code 风格设计
+主窗口模块 - OpenShot 风格设计
 """
 
 from pathlib import Path
@@ -12,10 +12,12 @@ from PyQt5.QtWidgets import (
     QGroupBox, QFormLayout, QComboBox, QLineEdit, QTableWidget,
     QTableWidgetItem, QHeaderView, QTabWidget, QSplitter,
     QAbstractItemView, QMenuBar, QMenu, QAction, QFrame,
-    QSizePolicy, QSpacerItem, QScrollArea
+    QSizePolicy, QSpacerItem, QScrollArea, QToolButton,
+    QDockWidget, QListWidget, QListWidgetItem, QMainWindow,
+    QStatusBar, QToolBar
 )
 from PyQt5.QtCore import Qt, QThread, QSize
-from PyQt5.QtGui import QFont, QColor, QPalette, QIcon
+from PyQt5.QtGui import QFont, QColor, QPalette, QIcon, QPixmap
 
 from src.config import (
     APP_NAME, __version__, DEFAULT_QUALITY, DEFAULT_MIN_SIZE_MB,
@@ -30,22 +32,22 @@ from src.core.compressor import get_exif_info, compress_image
 
 
 class MainWindow(QWidget):
-    """图片压缩工具主窗口 - VS Code 风格"""
+    """图片压缩工具主窗口 - OpenShot 风格"""
     
-    # VS Code Dark+ 主题颜色
-    BG_PRIMARY = "#1e1e1e"        # 主背景
-    BG_SECONDARY = "#252526"      # 侧边栏背景
-    BG_TERTIARY = "#2d2d30"       # 活动栏/面板背景
-    BORDER = "#3c3c3c"            # 边框
-    BORDER_ACTIVE = "#007acc"     # 活动边框（蓝色）
-    TEXT_PRIMARY = "#cccccc"      # 主文字
-    TEXT_SECONDARY = "#858585"    # 次要文字
-    TEXT_ACTIVE = "#ffffff"       # 活动文字
-    ACCENT = "#007acc"            # 强调色（蓝色）
-    ACCENT_HOVER = "#1177bb"      # 悬停色
-    BUTTON_BG = "#0e639c"         # 按钮背景
-    BUTTON_HOVER = "#1177bb"      # 按钮悬停
-    INPUT_BG = "#3c3c3c"          # 输入框背景
+    # OpenShot 风格配色
+    BG_DARK = "#1a1a1a"           # 主背景（接近黑色）
+    BG_PANEL = "#232323"          # 面板背景
+    BG_INPUT = "#2d2d2d"          # 输入框背景
+    BG_HOVER = "#3a3a3a"          # 悬停背景
+    BORDER = "#404040"            # 边框
+    BORDER_LIGHT = "#555555"      # 亮边框
+    TEXT_PRIMARY = "#e0e0e0"      # 主文字
+    TEXT_SECONDARY = "#909090"    # 次要文字
+    ACCENT = "#e67e22"            # 强调色（OpenShot 橙色）
+    ACCENT_HOVER = "#ff9933"      # 悬停橙色
+    BUTTON_PRIMARY = "#2980b9"    # 主按钮蓝色
+    BUTTON_HOVER = "#3498db"      # 按钮悬停
+    SUCCESS = "#27ae60"           # 成功绿色
     
     def __init__(self):
         super().__init__()
@@ -57,53 +59,76 @@ class MainWindow(QWidget):
         self.current_detailed_stats = []
         
         self.setWindowTitle(APP_NAME)
-        self.setMinimumSize(1200, 800)
-        self.resize(1400, 900)
+        self.setMinimumSize(1280, 800)
+        self.resize(1440, 900)
         
-        self._setup_vscode_style()
+        self._setup_openshot_style()
         self._setup_ui()
         self._connect_signals()
         self._load_history()
         self._load_presets()
     
-    def _setup_vscode_style(self):
-        """设置 VS Code 风格样式"""
+    def _setup_openshot_style(self):
+        """设置 OpenShot 风格样式"""
         self.setStyleSheet(f"""
             /* 全局样式 */
             QWidget {{
-                background-color: {self.BG_PRIMARY};
+                background-color: {self.BG_DARK};
                 color: {self.TEXT_PRIMARY};
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
+                font-family: 'Segoe UI', 'Ubuntu', 'Helvetica Neue', sans-serif;
                 font-size: 13px;
                 border: none;
-                outline: none;
             }}
             
-            /* 侧边栏样式 */
+            /* 工具栏 */
+            QToolBar {{
+                background-color: {self.BG_PANEL};
+                border-bottom: 1px solid {self.BORDER};
+                padding: 4px;
+                spacing: 4px;
+            }}
+            
+            QToolButton {{
+                background-color: transparent;
+                border: 1px solid transparent;
+                border-radius: 3px;
+                padding: 6px 12px;
+                color: {self.TEXT_PRIMARY};
+                font-size: 12px;
+            }}
+            
+            QToolButton:hover {{
+                background-color: {self.BG_HOVER};
+                border-color: {self.BORDER};
+            }}
+            
+            QToolButton:pressed {{
+                background-color: {self.BORDER_LIGHT};
+            }}
+            
+            /* 面板样式 */
             QGroupBox {{
-                background-color: {self.BG_SECONDARY};
+                background-color: {self.BG_PANEL};
                 border: 1px solid {self.BORDER};
-                border-radius: 0px;
-                margin: 0px;
-                padding: 12px;
-                font-weight: normal;
+                border-radius: 3px;
+                margin: 2px;
+                padding: 10px;
+                font-weight: bold;
             }}
             
             QGroupBox::title {{
                 color: {self.TEXT_SECONDARY};
                 subcontrol-origin: margin;
-                left: 12px;
-                padding: 0 6px;
+                left: 10px;
+                padding: 0 5px;
                 font-size: 11px;
-                text-transform: uppercase;
-                letter-spacing: 0.5px;
             }}
             
             /* 输入框 */
             QLineEdit {{
-                background-color: {self.INPUT_BG};
+                background-color: {self.BG_INPUT};
                 border: 1px solid {self.BORDER};
-                border-radius: 0px;
+                border-radius: 2px;
                 padding: 6px 10px;
                 color: {self.TEXT_PRIMARY};
                 font-size: 13px;
@@ -118,42 +143,56 @@ class MainWindow(QWidget):
                 color: {self.TEXT_SECONDARY};
             }}
             
-            /* 主按钮 - 蓝色 */
+            /* 按钮 - OpenShot 风格 */
             QPushButton {{
-                background-color: {self.BUTTON_BG};
-                color: white;
-                border: none;
-                border-radius: 0px;
-                padding: 6px 14px;
+                background-color: {self.BG_HOVER};
+                border: 1px solid {self.BORDER};
+                border-radius: 3px;
+                padding: 6px 16px;
+                color: {self.TEXT_PRIMARY};
                 font-size: 13px;
             }}
             
             QPushButton:hover {{
-                background-color: {self.BUTTON_HOVER};
+                background-color: {self.BORDER_LIGHT};
+                border-color: {self.BORDER_LIGHT};
             }}
             
             QPushButton:pressed {{
-                background-color: {self.ACCENT};
+                background-color: {self.BORDER};
             }}
             
             QPushButton:disabled {{
-                background-color: {self.BG_TERTIARY};
+                background-color: {self.BG_PANEL};
                 color: {self.TEXT_SECONDARY};
             }}
             
-            /* 次要按钮 */
-            QPushButton#secondaryBtn {{
-                background-color: {self.BG_TERTIARY};
-                border: 1px solid {self.BORDER};
-                color: {self.TEXT_PRIMARY};
+            /* 主按钮 - 橙色 */
+            QPushButton#primaryBtn {{
+                background-color: {self.ACCENT};
+                border-color: {self.ACCENT};
+                color: white;
+                font-weight: bold;
             }}
             
-            QPushButton#secondaryBtn:hover {{
-                background-color: #3c3c3c;
-                border-color: {self.TEXT_SECONDARY};
+            QPushButton#primaryBtn:hover {{
+                background-color: {self.ACCENT_HOVER};
+                border-color: {self.ACCENT_HOVER};
             }}
             
-            /* 复选框 - VS Code 风格 */
+            /* 蓝色按钮 */
+            QPushButton#blueBtn {{
+                background-color: {self.BUTTON_PRIMARY};
+                border-color: {self.BUTTON_PRIMARY};
+                color: white;
+            }}
+            
+            QPushButton#blueBtn:hover {{
+                background-color: {self.BUTTON_HOVER};
+                border-color: {self.BUTTON_HOVER};
+            }}
+            
+            /* 复选框 */
             QCheckBox {{
                 color: {self.TEXT_PRIMARY};
                 font-size: 13px;
@@ -164,9 +203,9 @@ class MainWindow(QWidget):
             QCheckBox::indicator {{
                 width: 16px;
                 height: 16px;
-                border-radius: 0px;
+                border-radius: 2px;
                 border: 1px solid {self.BORDER};
-                background-color: {self.INPUT_BG};
+                background-color: {self.BG_INPUT};
             }}
             
             QCheckBox::indicator:checked {{
@@ -175,69 +214,72 @@ class MainWindow(QWidget):
             }}
             
             QCheckBox::indicator:hover {{
-                border-color: {self.TEXT_SECONDARY};
+                border-color: {self.BORDER_LIGHT};
             }}
             
             /* 下拉框 */
             QComboBox {{
-                background-color: {self.INPUT_BG};
+                background-color: {self.BG_INPUT};
                 border: 1px solid {self.BORDER};
-                border-radius: 0px;
+                border-radius: 2px;
                 padding: 6px 10px;
                 color: {self.TEXT_PRIMARY};
                 min-width: 100px;
             }}
             
             QComboBox:hover {{
-                border-color: {self.TEXT_SECONDARY};
+                border-color: {self.BORDER_LIGHT};
             }}
             
             QComboBox::drop-down {{
                 border: none;
-                width: 20px;
+                width: 24px;
             }}
             
             QComboBox QAbstractItemView {{
-                background-color: {self.BG_SECONDARY};
+                background-color: {self.BG_PANEL};
                 border: 1px solid {self.BORDER};
                 selection-background-color: {self.ACCENT};
                 outline: none;
             }}
             
-            /* 滑块 - VS Code 风格 */
+            /* 滑块 - OpenShot 风格 */
             QSlider::groove:horizontal {{
-                height: 4px;
-                background-color: {self.INPUT_BG};
+                height: 6px;
+                background-color: {self.BG_INPUT};
+                border-radius: 3px;
             }}
             
             QSlider::sub-page:horizontal {{
                 background-color: {self.ACCENT};
+                border-radius: 3px;
             }}
             
             QSlider::add-page:horizontal {{
                 background-color: {self.BORDER};
+                border-radius: 3px;
             }}
             
             QSlider::handle:horizontal {{
-                width: 12px;
-                height: 12px;
-                margin: -4px 0;
-                background-color: white;
-                border: 1px solid {self.BORDER};
+                width: 16px;
+                height: 16px;
+                margin: -5px 0;
+                background-color: {self.TEXT_PRIMARY};
+                border: 2px solid {self.BG_PANEL};
+                border-radius: 8px;
             }}
             
             QSlider::handle:horizontal:hover {{
-                background-color: {self.ACCENT};
-                border-color: {self.ACCENT};
+                background-color: {self.ACCENT_HOVER};
             }}
             
             /* 数值框 */
             QSpinBox, QDoubleSpinBox {{
-                background-color: {self.INPUT_BG};
+                background-color: {self.BG_INPUT};
                 border: 1px solid {self.BORDER};
-                border-radius: 0px;
+                border-radius: 2px;
                 padding: 4px 8px;
-                padding-right: 18px;
+                padding-right: 16px;
                 color: {self.TEXT_PRIMARY};
             }}
             
@@ -259,87 +301,93 @@ class MainWindow(QWidget):
                 background-color: transparent;
             }}
             
-            QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover,
+            QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover {{
+                background-color: {self.BG_HOVER};
+            }}
+            
             QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover {{
-                background-color: {self.BG_TERTIARY};
-            }}
-            
-            QSpinBox::up-arrow {{
-                image: none;
-                border-left: 3px solid transparent;
-                border-right: 3px solid transparent;
-                border-bottom: 4px solid {self.TEXT_SECONDARY};
-            }}
-            
-            QSpinBox::down-arrow {{
-                image: none;
-                border-left: 3px solid transparent;
-                border-right: 3px solid transparent;
-                border-top: 4px solid {self.TEXT_SECONDARY};
+                background-color: {self.BG_HOVER};
             }}
             
             /* 进度条 */
             QProgressBar {{
-                background-color: {self.INPUT_BG};
+                background-color: {self.BG_INPUT};
                 border: 1px solid {self.BORDER};
-                border-radius: 0px;
+                border-radius: 2px;
                 text-align: center;
-                height: 22px;
+                height: 20px;
                 color: {self.TEXT_PRIMARY};
                 font-size: 11px;
             }}
             
             QProgressBar::chunk {{
                 background-color: {self.ACCENT};
+                border-radius: 1px;
             }}
             
-            /* 标签页 - VS Code 风格 */
+            /* 标签页 */
             QTabWidget::pane {{
-                border: none;
-                background-color: {self.BG_PRIMARY};
+                border: 1px solid {self.BORDER};
+                background-color: {self.BG_PANEL};
             }}
             
             QTabBar::tab {{
-                background-color: {self.BG_SECONDARY};
+                background-color: {self.BG_INPUT};
                 border: 1px solid {self.BORDER};
                 border-bottom: none;
                 color: {self.TEXT_SECONDARY};
                 padding: 8px 16px;
                 margin-right: 2px;
-                border-radius: 0px;
+                border-radius: 2px 2px 0 0;
             }}
             
             QTabBar::tab:selected {{
-                background-color: {self.BG_PRIMARY};
+                background-color: {self.BG_PANEL};
                 border-top: 2px solid {self.ACCENT};
-                color: {self.TEXT_ACTIVE};
+                color: {self.TEXT_PRIMARY};
             }}
             
             QTabBar::tab:hover:!selected {{
-                background-color: {self.BG_TERTIARY};
+                background-color: {self.BG_HOVER};
                 color: {self.TEXT_PRIMARY};
+            }}
+            
+            /* 列表 */
+            QListWidget {{
+                background-color: {self.BG_INPUT};
+                border: 1px solid {self.BORDER};
+                color: {self.TEXT_PRIMARY};
+            }}
+            
+            QListWidget::item {{
+                padding: 6px;
+                border-bottom: 1px solid {self.BORDER};
+            }}
+            
+            QListWidget::item:selected {{
+                background-color: {self.ACCENT};
             }}
             
             /* 文本框 */
             QTextEdit {{
-                background-color: {self.BG_PRIMARY};
+                background-color: {self.BG_INPUT};
                 border: 1px solid {self.BORDER};
-                border-radius: 0px;
-                padding: 10px;
+                border-radius: 2px;
+                padding: 8px;
                 color: {self.TEXT_PRIMARY};
-                font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+                font-family: 'Consolas', 'Monaco', monospace;
                 font-size: 12px;
             }}
             
             /* 表格 */
             QTableWidget {{
-                background-color: {self.BG_PRIMARY};
+                background-color: {self.BG_INPUT};
                 border: 1px solid {self.BORDER};
                 gridline-color: {self.BORDER};
             }}
             
             QTableWidget::item {{
-                padding: 8px;
+                padding: 6px;
                 color: {self.TEXT_PRIMARY};
                 border-bottom: 1px solid {self.BORDER};
             }}
@@ -350,13 +398,14 @@ class MainWindow(QWidget):
             }}
             
             QHeaderView::section {{
-                background-color: {self.BG_SECONDARY};
-                color: {self.TEXT_PRIMARY};
+                background-color: {self.BG_PANEL};
+                color: {self.TEXT_SECONDARY};
                 padding: 8px;
                 border: none;
                 border-right: 1px solid {self.BORDER};
-                font-size: 12px;
-                font-weight: normal;
+                border-bottom: 1px solid {self.BORDER};
+                font-size: 11px;
+                font-weight: bold;
             }}
             
             /* 标签 */
@@ -370,9 +419,16 @@ class MainWindow(QWidget):
                 color: {self.BORDER};
             }}
             
+            /* 状态栏 */
+            QStatusBar {{
+                background-color: {self.BG_PANEL};
+                border-top: 1px solid {self.BORDER};
+                color: {self.TEXT_SECONDARY};
+            }}
+            
             /* 菜单栏 */
             QMenuBar {{
-                background-color: {self.BG_SECONDARY};
+                background-color: {self.BG_PANEL};
                 border-bottom: 1px solid {self.BORDER};
             }}
             
@@ -383,18 +439,18 @@ class MainWindow(QWidget):
             }}
             
             QMenuBar::item:selected {{
-                background-color: {self.BG_TERTIARY};
-                color: {self.TEXT_ACTIVE};
+                background-color: {self.ACCENT};
+                color: white;
             }}
             
             QMenu {{
-                background-color: {self.BG_SECONDARY};
+                background-color: {self.BG_PANEL};
                 border: 1px solid {self.BORDER};
                 padding: 4px;
             }}
             
             QMenu::item {{
-                padding: 8px 16px;
+                padding: 6px 16px;
                 color: {self.TEXT_PRIMARY};
             }}
             
@@ -405,18 +461,19 @@ class MainWindow(QWidget):
             
             /* 滚动条 */
             QScrollBar:vertical {{
-                background-color: {self.BG_SECONDARY};
-                width: 14px;
+                background-color: {self.BG_PANEL};
+                width: 12px;
                 border-left: 1px solid {self.BORDER};
             }}
             
             QScrollBar::handle:vertical {{
-                background-color: {self.INPUT_BG};
+                background-color: {self.BORDER};
                 min-height: 30px;
+                border-radius: 2px;
             }}
             
             QScrollBar::handle:vertical:hover {{
-                background-color: {self.TEXT_SECONDARY};
+                background-color: {self.BORDER_LIGHT};
             }}
             
             QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
@@ -425,98 +482,142 @@ class MainWindow(QWidget):
         """)
     
     def _setup_ui(self):
-        """设置用户界面 - VS Code 风格"""
-        main_layout = QHBoxLayout(self)
+        """设置用户界面 - OpenShot 风格"""
+        main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
         
-        # ========== 左侧边栏 (1/3) ==========
-        left_sidebar = QWidget()
-        left_sidebar.setFixedWidth(400)
-        left_sidebar.setStyleSheet(f"background-color: {self.BG_SECONDARY}; border-right: 1px solid {self.BORDER};")
-        left_layout = QVBoxLayout(left_sidebar)
+        # ========== 顶部工具栏 ==========
+        toolbar = QWidget()
+        toolbar.setFixedHeight(50)
+        toolbar.setStyleSheet(f"background-color: {self.BG_PANEL}; border-bottom: 1px solid {self.BORDER};")
+        toolbar_layout = QHBoxLayout(toolbar)
+        toolbar_layout.setContentsMargins(12, 6, 12, 6)
+        toolbar_layout.setSpacing(10)
+        
+        # Logo / 标题
+        title_label = QLabel(f"🖼️ {APP_NAME}")
+        title_label.setStyleSheet(f"color: {self.ACCENT}; font-size: 16px; font-weight: bold;")
+        toolbar_layout.addWidget(title_label)
+        
+        toolbar_layout.addSpacing(20)
+        
+        # 工具栏按钮
+        open_btn = QPushButton("📁 打开")
+        open_btn.setObjectName("blueBtn")
+        open_btn.clicked.connect(self._select_input)
+        toolbar_layout.addWidget(open_btn)
+        
+        save_btn = QPushButton("💾 保存预设")
+        save_btn.clicked.connect(self._save_preset)
+        toolbar_layout.addWidget(save_btn)
+        
+        toolbar_layout.addStretch()
+        
+        # 主操作按钮
+        self.start_btn = QPushButton("▶ 开始压缩")
+        self.start_btn.setObjectName("primaryBtn")
+        self.start_btn.setMinimumWidth(120)
+        self.start_btn.clicked.connect(self._start_compression)
+        toolbar_layout.addWidget(self.start_btn)
+        
+        self.cancel_btn = QPushButton("⏹ 取消")
+        self.cancel_btn.setEnabled(False)
+        self.cancel_btn.clicked.connect(self._cancel_compression)
+        toolbar_layout.addWidget(self.cancel_btn)
+        
+        toolbar_layout.addSpacing(10)
+        
+        about_btn = QPushButton("?")
+        about_btn.setFixedWidth(30)
+        about_btn.setToolTip("关于")
+        about_btn.clicked.connect(self._show_about)
+        toolbar_layout.addWidget(about_btn)
+        
+        main_layout.addWidget(toolbar)
+        
+        # ========== 中央区域 ==========
+        center_widget = QWidget()
+        center_layout = QHBoxLayout(center_widget)
+        center_layout.setContentsMargins(8, 8, 8, 8)
+        center_layout.setSpacing(8)
+        
+        # ===== 左侧面板（项目文件）=====
+        left_panel = QWidget()
+        left_panel.setFixedWidth(320)
+        left_layout = QVBoxLayout(left_panel)
         left_layout.setContentsMargins(0, 0, 0, 0)
-        left_layout.setSpacing(0)
+        left_layout.setSpacing(8)
         
-        # 标题栏
-        header = QWidget()
-        header.setStyleSheet(f"background-color: {self.BG_SECONDARY}; border-bottom: 1px solid {self.BORDER};")
-        header_layout = QHBoxLayout(header)
-        header_layout.setContentsMargins(12, 8, 12, 8)
-        
-        title_label = QLabel("EXPLORER")
-        title_label.setStyleSheet(f"color: {self.TEXT_SECONDARY}; font-size: 11px; font-weight: bold;")
-        header_layout.addWidget(title_label)
-        left_layout.addWidget(header)
-        
-        # 滚动区域
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.NoFrame)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        
-        scroll_content = QWidget()
-        scroll_layout = QVBoxLayout(scroll_content)
-        scroll_layout.setContentsMargins(12, 12, 12, 12)
-        scroll_layout.setSpacing(16)
-        
-        # ===== 输入输出组 =====
-        io_group = self._create_vscode_group("输入输出")
-        io_layout = QVBoxLayout(io_group)
-        io_layout.setSpacing(8)
+        # 输入设置组
+        input_group = QGroupBox("📂 输入设置")
+        input_layout = QVBoxLayout(input_group)
+        input_layout.setSpacing(8)
         
         # 输入路径
-        input_label = QLabel("输入文件夹")
-        input_label.setStyleSheet(f"color: {self.TEXT_SECONDARY}; font-size: 12px;")
-        io_layout.addWidget(input_label)
+        input_label = QLabel("输入文件夹:")
+        input_label.setStyleSheet(f"color: {self.TEXT_SECONDARY}; font-size: 11px;")
+        input_layout.addWidget(input_label)
         
         input_row = QHBoxLayout()
         self.input_edit = DragDropLineEdit()
-        self.input_edit.setPlaceholderText("选择或拖拽文件夹...")
+        self.input_edit.setPlaceholderText("选择文件夹...")
         input_row.addWidget(self.input_edit)
         
         browse_input = QPushButton("...")
-        browse_input.setFixedWidth(28)
-        browse_input.setToolTip("浏览")
+        browse_input.setFixedWidth(32)
         browse_input.clicked.connect(self._select_input)
-        browse_input.setObjectName("secondaryBtn")
         input_row.addWidget(browse_input)
-        io_layout.addLayout(input_row)
+        input_layout.addLayout(input_row)
         
         # 输出路径
-        output_label = QLabel("输出文件夹")
-        output_label.setStyleSheet(f"color: {self.TEXT_SECONDARY}; font-size: 12px;")
-        io_layout.addWidget(output_label)
+        output_label = QLabel("输出文件夹:")
+        output_label.setStyleSheet(f"color: {self.TEXT_SECONDARY}; font-size: 11px;")
+        input_layout.addWidget(output_label)
         
         output_row = QHBoxLayout()
         self.output_edit = DragDropLineEdit()
-        self.output_edit.setPlaceholderText("留空则覆盖原文件")
+        self.output_edit.setPlaceholderText("留空覆盖原文件")
         output_row.addWidget(self.output_edit)
         
         browse_output = QPushButton("...")
-        browse_output.setFixedWidth(28)
-        browse_output.setToolTip("浏览")
+        browse_output.setFixedWidth(32)
         browse_output.clicked.connect(self._select_output)
-        browse_output.setObjectName("secondaryBtn")
         output_row.addWidget(browse_output)
-        io_layout.addLayout(output_row)
+        input_layout.addLayout(output_row)
         
         # 历史记录
-        history_label = QLabel("历史记录")
-        history_label.setStyleSheet(f"color: {self.TEXT_SECONDARY}; font-size: 12px;")
-        io_layout.addWidget(history_label)
+        history_label = QLabel("历史记录:")
+        history_label.setStyleSheet(f"color: {self.TEXT_SECONDARY}; font-size: 11px;")
+        input_layout.addWidget(history_label)
         
         self.history_combo = QComboBox()
-        self.history_combo.setPlaceholderText("选择历史记录...")
+        self.history_combo.setPlaceholderText("选择...")
         self.history_combo.currentTextChanged.connect(self._on_history_selected)
-        io_layout.addWidget(self.history_combo)
+        input_layout.addWidget(self.history_combo)
         
-        scroll_layout.addWidget(io_group)
+        left_layout.addWidget(input_group)
         
-        # ===== 预设配置组 =====
-        preset_group = self._create_vscode_group("预设配置")
+        # 文件列表
+        files_group = QGroupBox("📋 文件列表")
+        files_layout = QVBoxLayout(files_group)
+        
+        self.file_list = QListWidget()
+        self.file_list.setAlternatingRowColors(False)
+        files_layout.addWidget(self.file_list)
+        
+        file_info = QLabel("0 个文件")
+        file_info.setStyleSheet(f"color: {self.TEXT_SECONDARY}; font-size: 11px;")
+        file_info.setAlignment(Qt.AlignCenter)
+        files_layout.addWidget(file_info)
+        self.file_info_label = file_info
+        
+        left_layout.addWidget(files_group, 1)
+        
+        # 预设配置
+        preset_group = QGroupBox("🎯 预设")
         preset_layout = QVBoxLayout(preset_group)
-        preset_layout.setSpacing(8)
+        preset_layout.setSpacing(6)
         
         preset_row = QHBoxLayout()
         self.preset_combo = QComboBox()
@@ -524,50 +625,98 @@ class MainWindow(QWidget):
         self.preset_combo.currentIndexChanged.connect(self._on_preset_selected)
         preset_row.addWidget(self.preset_combo)
         
-        save_preset_btn = QPushButton("保存")
-        save_preset_btn.setFixedWidth(50)
-        save_preset_btn.setObjectName("secondaryBtn")
+        save_preset_btn = QPushButton("+")
+        save_preset_btn.setFixedWidth(28)
+        save_preset_btn.setToolTip("保存当前设置")
         save_preset_btn.clicked.connect(self._save_preset)
         preset_row.addWidget(save_preset_btn)
         preset_layout.addLayout(preset_row)
         
         self.preset_desc_label = QLabel("")
-        self.preset_desc_label.setStyleSheet(f"color: {self.TEXT_SECONDARY}; font-size: 11px;")
+        self.preset_desc_label.setStyleSheet(f"color: {self.TEXT_SECONDARY}; font-size: 10px;")
         preset_layout.addWidget(self.preset_desc_label)
         
-        scroll_layout.addWidget(preset_group)
+        left_layout.addWidget(preset_group)
         
-        # ===== 输出设置组（左侧）=====
-        settings_group = self._create_vscode_group("输出设置")
+        center_layout.addWidget(left_panel)
+        
+        # ===== 中间面板（预览和设置）=====
+        mid_panel = QWidget()
+        mid_layout = QVBoxLayout(mid_panel)
+        mid_layout.setContentsMargins(0, 0, 0, 0)
+        mid_layout.setSpacing(8)
+        
+        # 预览区域
+        preview_group = QGroupBox("👁️ 预览")
+        preview_layout = QVBoxLayout(preview_group)
+        
+        # 预览按钮行
+        preview_btn_row = QHBoxLayout()
+        self.preview_btn = QPushButton("🔍 预览压缩效果")
+        self.preview_btn.setObjectName("blueBtn")
+        self.preview_btn.clicked.connect(self._preview_compression)
+        preview_btn_row.addWidget(self.preview_btn)
+        
+        exif_btn = QPushButton("📋 EXIF")
+        exif_btn.clicked.connect(self._show_exif)
+        preview_btn_row.addWidget(exif_btn)
+        preview_btn_row.addStretch()
+        preview_layout.addLayout(preview_btn_row)
+        
+        # 预览信息
+        preview_info = QHBoxLayout()
+        self.preview_original_label = QLabel("原始: -")
+        self.preview_original_label.setStyleSheet(f"color: {self.TEXT_SECONDARY};")
+        preview_info.addWidget(self.preview_original_label)
+        
+        arrow = QLabel("→")
+        arrow.setStyleSheet(f"color: {self.ACCENT}; font-weight: bold; padding: 0 10px;")
+        preview_info.addWidget(arrow)
+        
+        self.preview_compressed_label = QLabel("压缩后: -")
+        self.preview_compressed_label.setStyleSheet(f"color: {self.TEXT_PRIMARY}; font-weight: bold;")
+        preview_info.addWidget(self.preview_compressed_label)
+        
+        preview_info.addSpacing(20)
+        
+        self.preview_savings_label = QLabel("节省: -")
+        self.preview_savings_label.setStyleSheet(f"color: {self.SUCCESS}; font-weight: bold;")
+        preview_info.addWidget(self.preview_savings_label)
+        preview_info.addStretch()
+        
+        preview_layout.addLayout(preview_info)
+        mid_layout.addWidget(preview_group)
+        
+        # 输出设置组
+        settings_group = QGroupBox("⚙️ 输出设置")
         settings_layout = QVBoxLayout(settings_group)
-        settings_layout.setSpacing(10)
+        settings_layout.setSpacing(12)
         
-        # 输出格式
-        format_row = QHBoxLayout()
-        format_row.addWidget(QLabel("输出格式:"))
+        # 格式和大小
+        row1 = QHBoxLayout()
+        row1.addWidget(QLabel("格式:"))
         self.format_combo = QComboBox()
         self.format_combo.addItems(["保持原格式", "JPG", "PNG", "WebP"])
         self.format_combo.setFixedWidth(110)
-        format_row.addWidget(self.format_combo)
-        format_row.addStretch()
-        settings_layout.addLayout(format_row)
+        row1.addWidget(self.format_combo)
         
-        # 最小大小
-        minsize_row = QHBoxLayout()
-        minsize_row.addWidget(QLabel("最小大小:"))
+        row1.addSpacing(20)
+        
+        row1.addWidget(QLabel("最小:"))
         self.min_size_spin = QDoubleSpinBox()
         self.min_size_spin.setRange(0, 100)
         self.min_size_spin.setDecimals(1)
         self.min_size_spin.setValue(DEFAULT_MIN_SIZE_MB)
         self.min_size_spin.setSuffix(" MB")
         self.min_size_spin.setFixedWidth(90)
-        minsize_row.addWidget(self.min_size_spin)
-        minsize_row.addStretch()
-        settings_layout.addLayout(minsize_row)
+        row1.addWidget(self.min_size_spin)
+        row1.addStretch()
         
-        # 压缩质量
+        settings_layout.addLayout(row1)
+        
+        # 质量滑块
         quality_row = QHBoxLayout()
-        quality_row.addWidget(QLabel("压缩质量:"))
+        quality_row.addWidget(QLabel("质量:"))
         
         self.quality_slider = QSlider(Qt.Horizontal)
         self.quality_slider.setRange(1, 100)
@@ -578,7 +727,7 @@ class MainWindow(QWidget):
         self.quality_spin.setRange(1, 100)
         self.quality_spin.setValue(DEFAULT_QUALITY)
         self.quality_spin.setSuffix("%")
-        self.quality_spin.setFixedWidth(50)
+        self.quality_spin.setFixedWidth(55)
         quality_row.addWidget(self.quality_spin)
         
         settings_layout.addLayout(quality_row)
@@ -593,7 +742,7 @@ class MainWindow(QWidget):
         self.max_width_spin = QSpinBox()
         self.max_width_spin.setRange(0, 10000)
         self.max_width_spin.setValue(0)
-        self.max_width_spin.setSuffix(" px")
+        self.max_width_spin.setSuffix("px")
         self.max_width_spin.setFixedWidth(70)
         self.max_width_spin.setEnabled(False)
         resize_row.addWidget(self.max_width_spin)
@@ -602,7 +751,7 @@ class MainWindow(QWidget):
         self.max_height_spin = QSpinBox()
         self.max_height_spin.setRange(0, 10000)
         self.max_height_spin.setValue(0)
-        self.max_height_spin.setSuffix(" px")
+        self.max_height_spin.setSuffix("px")
         self.max_height_spin.setFixedWidth(70)
         self.max_height_spin.setEnabled(False)
         resize_row.addWidget(self.max_height_spin)
@@ -625,7 +774,7 @@ class MainWindow(QWidget):
         self.target_size_spin = QSpinBox()
         self.target_size_spin.setRange(10, 10000)
         self.target_size_spin.setValue(200)
-        self.target_size_spin.setSuffix(" KB")
+        self.target_size_spin.setSuffix("KB")
         self.target_size_spin.setFixedWidth(70)
         self.target_size_spin.setEnabled(False)
         smart_row.addWidget(self.target_size_spin)
@@ -646,195 +795,177 @@ class MainWindow(QWidget):
         
         settings_layout.addLayout(exif_row)
         
-        scroll_layout.addWidget(settings_group)
-        scroll_layout.addStretch()
+        mid_layout.addWidget(settings_group)
         
-        scroll.setWidget(scroll_content)
-        left_layout.addWidget(scroll)
+        # 操作选项
+        options_group = QGroupBox("🔧 选项")
+        options_layout = QHBoxLayout(options_group)
         
-        main_layout.addWidget(left_sidebar)
-        
-        # ========== 右侧主区域 (2/3) ==========
-        right_panel = QWidget()
-        right_layout = QVBoxLayout(right_panel)
-        right_layout.setContentsMargins(20, 16, 20, 16)
-        right_layout.setSpacing(16)
-        
-        # 顶部标题栏
-        top_bar = QWidget()
-        top_layout = QHBoxLayout(top_bar)
-        top_layout.setContentsMargins(0, 0, 0, 0)
-        
-        title = QLabel(f"{APP_NAME}  v{__version__}")
-        title.setStyleSheet(f"color: {self.TEXT_ACTIVE}; font-size: 20px; font-weight: 600;")
-        top_layout.addWidget(title)
-        
-        top_layout.addStretch()
-        
-        about_btn = QPushButton("关于")
-        about_btn.setFixedWidth(60)
-        about_btn.setObjectName("secondaryBtn")
-        about_btn.clicked.connect(self._show_about)
-        top_layout.addWidget(about_btn)
-        
-        right_layout.addWidget(top_bar)
-        
-        # 压缩预览组
-        preview_group = self._create_vscode_group("压缩预览")
-        preview_layout = QVBoxLayout(preview_group)
-        preview_layout.setSpacing(12)
-        
-        preview_btn_row = QHBoxLayout()
-        self.preview_btn = QPushButton("预览第一张图片")
-        self.preview_btn.setFixedWidth(140)
-        self.preview_btn.clicked.connect(self._preview_compression)
-        preview_btn_row.addWidget(self.preview_btn)
-        
-        exif_btn = QPushButton("查看 EXIF")
-        exif_btn.setFixedWidth(90)
-        exif_btn.setObjectName("secondaryBtn")
-        exif_btn.clicked.connect(self._show_exif)
-        preview_btn_row.addWidget(exif_btn)
-        preview_btn_row.addStretch()
-        preview_layout.addLayout(preview_btn_row)
-        
-        preview_info = QHBoxLayout()
-        self.preview_original_label = QLabel("原图: -")
-        self.preview_original_label.setStyleSheet(f"color: {self.TEXT_SECONDARY};")
-        preview_info.addWidget(self.preview_original_label)
-        
-        arrow = QLabel("→")
-        arrow.setStyleSheet(f"color: {self.ACCENT}; padding: 0 8px;")
-        preview_info.addWidget(arrow)
-        
-        self.preview_compressed_label = QLabel("压缩后: -")
-        self.preview_compressed_label.setStyleSheet(f"color: {self.TEXT_ACTIVE};")
-        preview_info.addWidget(self.preview_compressed_label)
-        
-        preview_info.addSpacing(20)
-        
-        self.preview_savings_label = QLabel("节省: -")
-        self.preview_savings_label.setStyleSheet("color: #4ec9b0;")
-        preview_info.addWidget(self.preview_savings_label)
-        preview_info.addStretch()
-        
-        preview_layout.addLayout(preview_info)
-        right_layout.addWidget(preview_group)
-        
-        # 操作组
-        action_group = self._create_vscode_group("操作")
-        action_layout = QVBoxLayout(action_group)
-        action_layout.setSpacing(12)
-        
-        # 选项
-        options_row = QHBoxLayout()
         self.subfolder_cb = QCheckBox("包含子文件夹")
         self.subfolder_cb.setChecked(True)
-        options_row.addWidget(self.subfolder_cb)
+        options_layout.addWidget(self.subfolder_cb)
         
-        self.incremental_cb = QCheckBox("跳过已处理文件")
+        self.incremental_cb = QCheckBox("跳过已处理")
         self.incremental_cb.setChecked(True)
-        options_row.addWidget(self.incremental_cb)
-        options_row.addStretch()
-        action_layout.addLayout(options_row)
+        options_layout.addWidget(self.incremental_cb)
+        
+        options_layout.addStretch()
+        
+        mid_layout.addWidget(options_group)
+        mid_layout.addStretch()
+        
+        center_layout.addWidget(mid_panel, 1)
+        
+        # ===== 右侧面板（统计信息）=====
+        right_panel = QWidget()
+        right_panel.setFixedWidth(280)
+        right_layout = QVBoxLayout(right_panel)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        right_layout.setSpacing(8)
+        
+        # 统计信息组
+        stats_group = QGroupBox("📊 统计")
+        stats_layout = QVBoxLayout(stats_group)
+        stats_layout.setSpacing(8)
         
         # 进度条
         self.progress_bar = QProgressBar()
         self.progress_bar.setTextVisible(True)
         self.progress_bar.setValue(0)
-        action_layout.addWidget(self.progress_bar)
+        stats_layout.addWidget(self.progress_bar)
         
         self.stats_label = QLabel("准备就绪")
         self.stats_label.setAlignment(Qt.AlignCenter)
-        self.stats_label.setStyleSheet(f"color: {self.TEXT_SECONDARY}; font-size: 12px;")
-        action_layout.addWidget(self.stats_label)
+        self.stats_label.setStyleSheet(f"color: {self.TEXT_SECONDARY}; padding: 4px;")
+        stats_layout.addWidget(self.stats_label)
         
-        # 按钮
-        btn_row = QHBoxLayout()
-        btn_row.setSpacing(8)
+        # 统计数字
+        stats_grid = QHBoxLayout()
         
-        self.cancel_btn = QPushButton("取消")
-        self.cancel_btn.setObjectName("secondaryBtn")
-        self.cancel_btn.setEnabled(False)
-        self.cancel_btn.clicked.connect(self._cancel_compression)
-        btn_row.addWidget(self.cancel_btn)
+        success_box = QVBoxLayout()
+        success_label = QLabel("成功")
+        success_label.setStyleSheet(f"color: {self.TEXT_SECONDARY}; font-size: 10px;")
+        success_label.setAlignment(Qt.AlignCenter)
+        success_box.addWidget(success_label)
+        self.success_count_label = QLabel("0")
+        self.success_count_label.setStyleSheet(f"color: {self.SUCCESS}; font-size: 18px; font-weight: bold;")
+        self.success_count_label.setAlignment(Qt.AlignCenter)
+        success_box.addWidget(self.success_count_label)
+        stats_grid.addLayout(success_box)
         
-        self.start_btn = QPushButton("开始压缩")
-        self.start_btn.setDefault(True)
-        self.start_btn.setMinimumWidth(120)
-        self.start_btn.clicked.connect(self._start_compression)
-        btn_row.addWidget(self.start_btn, 1)
+        skip_box = QVBoxLayout()
+        skip_label = QLabel("跳过")
+        skip_label.setStyleSheet(f"color: {self.TEXT_SECONDARY}; font-size: 10px;")
+        skip_label.setAlignment(Qt.AlignCenter)
+        skip_box.addWidget(skip_label)
+        self.skip_count_label = QLabel("0")
+        self.skip_count_label.setStyleSheet(f"color: {self.TEXT_SECONDARY}; font-size: 18px; font-weight: bold;")
+        self.skip_count_label.setAlignment(Qt.AlignCenter)
+        skip_box.addWidget(self.skip_count_label)
+        stats_grid.addLayout(skip_box)
         
-        action_layout.addLayout(btn_row)
+        error_box = QVBoxLayout()
+        error_label = QLabel("失败")
+        error_label.setStyleSheet(f"color: {self.TEXT_SECONDARY}; font-size: 10px;")
+        error_label.setAlignment(Qt.AlignCenter)
+        error_box.addWidget(error_label)
+        self.error_count_label = QLabel("0")
+        self.error_count_label.setStyleSheet(f"color: #e74c3c; font-size: 18px; font-weight: bold;")
+        self.error_count_label.setAlignment(Qt.AlignCenter)
+        error_box.addWidget(self.error_count_label)
+        stats_grid.addLayout(error_box)
         
-        self.export_btn = QPushButton("导出统计")
-        self.export_btn.setObjectName("secondaryBtn")
+        stats_layout.addLayout(stats_grid)
+        
+        # 节省空间
+        savings_box = QVBoxLayout()
+        savings_title = QLabel("共节省空间")
+        savings_title.setStyleSheet(f"color: {self.TEXT_SECONDARY}; font-size: 11px;")
+        savings_title.setAlignment(Qt.AlignCenter)
+        savings_box.addWidget(savings_title)
+        self.total_savings_label = QLabel("0 B")
+        self.total_savings_label.setStyleSheet(f"color: {self.SUCCESS}; font-size: 16px; font-weight: bold;")
+        self.total_savings_label.setAlignment(Qt.AlignCenter)
+        savings_box.addWidget(self.total_savings_label)
+        stats_layout.addLayout(savings_box)
+        
+        # 导出按钮
+        self.export_btn = QPushButton("📤 导出统计")
         self.export_btn.setEnabled(False)
         self.export_btn.clicked.connect(self._export_stats)
-        action_layout.addWidget(self.export_btn)
+        stats_layout.addWidget(self.export_btn)
         
-        right_layout.addWidget(action_group)
-        right_layout.addStretch()
+        right_layout.addWidget(stats_group)
         
-        # 底部面板（日志区）
+        # 详细信息表格
+        detail_group = QGroupBox("📝 详情")
+        detail_layout = QVBoxLayout(detail_group)
+        
+        self.stats_table = QTableWidget()
+        self.stats_table.setColumnCount(4)
+        self.stats_table.setHorizontalHeaderLabels(["文件", "状态", "原始", "压缩后"])
+        self.stats_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        self.stats_table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.stats_table.setAlternatingRowColors(False)
+        detail_layout.addWidget(self.stats_table)
+        
+        right_layout.addWidget(detail_group, 1)
+        
+        center_layout.addWidget(right_panel)
+        
+        main_layout.addWidget(center_widget, 1)
+        
+        # ========== 底部日志区域 ==========
         bottom_panel = QWidget()
-        bottom_panel.setFixedHeight(220)
-        bottom_panel.setStyleSheet(f"background-color: {self.BG_PRIMARY}; border-top: 1px solid {self.BORDER};")
+        bottom_panel.setFixedHeight(180)
+        bottom_panel.setStyleSheet(f"background-color: {self.BG_PANEL}; border-top: 1px solid {self.BORDER};")
         bottom_layout = QVBoxLayout(bottom_panel)
-        bottom_layout.setContentsMargins(0, 0, 0, 0)
-        bottom_layout.setSpacing(0)
+        bottom_layout.setContentsMargins(8, 8, 8, 8)
+        bottom_layout.setSpacing(4)
         
-        self.tab_widget = QTabWidget()
-        self.tab_widget.setDocumentMode(True)
+        # 日志标题
+        log_header = QWidget()
+        log_header_layout = QHBoxLayout(log_header)
+        log_header_layout.setContentsMargins(0, 0, 0, 0)
         
-        # 输出标签页
+        log_title = QLabel("📋 输出日志")
+        log_title.setStyleSheet(f"color: {self.TEXT_SECONDARY}; font-size: 11px; font-weight: bold;")
+        log_header_layout.addWidget(log_title)
+        log_header_layout.addStretch()
+        
+        clear_btn = QPushButton("清除")
+        clear_btn.setFixedWidth(50)
+        clear_btn.setStyleSheet(f"font-size: 10px; padding: 2px 6px;")
+        clear_btn.clicked.connect(self._clear_log)
+        log_header_layout.addWidget(clear_btn)
+        
+        bottom_layout.addWidget(log_header)
+        
+        # 日志文本框
         self.log_text = QTextEdit()
         self.log_text.setReadOnly(True)
         self.log_text.setPlaceholderText("等待开始...")
-        self.tab_widget.addTab(self.log_text, "输出")
+        bottom_layout.addWidget(self.log_text)
         
-        # 统计标签页
-        self.stats_table = QTableWidget()
-        self.stats_table.setColumnCount(7)
-        self.stats_table.setHorizontalHeaderLabels([
-            "序号", "文件名", "状态", "原始大小", "压缩后", "节省", "尺寸变化"
-        ])
-        self.stats_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
-        self.stats_table.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self.stats_table.setAlternatingRowColors(False)
-        self.tab_widget.addTab(self.stats_table, "统计")
+        main_layout.addWidget(bottom_panel)
         
-        bottom_layout.addWidget(self.tab_widget)
+        # ========== 状态栏 ==========
+        status_bar = QWidget()
+        status_bar.setFixedHeight(26)
+        status_bar.setStyleSheet(f"background-color: {self.BG_PANEL}; border-top: 1px solid {self.BORDER};")
+        status_layout = QHBoxLayout(status_bar)
+        status_layout.setContentsMargins(12, 4, 12, 4)
         
-        # 组装右侧面板
-        right_container = QWidget()
-        right_container_layout = QVBoxLayout(right_container)
-        right_container_layout.setContentsMargins(0, 0, 0, 0)
-        right_container_layout.setSpacing(16)
+        self.status_label = QLabel(f"就绪 | {APP_NAME} v{__version__}")
+        self.status_label.setStyleSheet(f"color: {self.TEXT_SECONDARY}; font-size: 11px;")
+        status_layout.addWidget(self.status_label)
         
-        # 可滚动的主内容区
-        right_scroll = QScrollArea()
-        right_scroll.setWidgetResizable(True)
-        right_scroll.setFrameShape(QFrame.NoFrame)
-        right_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        status_layout.addStretch()
         
-        right_content = QWidget()
-        right_content_layout = QVBoxLayout(right_content)
-        right_content_layout.setContentsMargins(0, 0, 0, 0)
-        right_content_layout.setSpacing(16)
-        right_content_layout.addWidget(top_bar)
-        right_content_layout.addWidget(preview_group)
-        right_content_layout.addWidget(action_group)
-        right_content_layout.addStretch()
-        
-        right_scroll.setWidget(right_content)
-        right_container_layout.addWidget(right_scroll, 1)
-        right_container_layout.addWidget(bottom_panel)
-        
-        main_layout.addWidget(right_container, 2)
+        main_layout.addWidget(status_bar)
     
-    def _create_vscode_group(self, title):
-        """创建 VS Code 风格的分组"""
+    def _create_openshot_group(self, title):
+        """创建 OpenShot 风格的分组"""
         group = QGroupBox(title)
         return group
     
@@ -842,6 +973,32 @@ class MainWindow(QWidget):
         """连接信号与槽"""
         self.quality_slider.valueChanged.connect(self.quality_spin.setValue)
         self.quality_spin.valueChanged.connect(self.quality_slider.setValue)
+        self.input_edit.textChanged.connect(self._update_file_list)
+    
+    def _update_file_list(self):
+        """更新文件列表"""
+        input_path = self.input_edit.text()
+        self.file_list.clear()
+        
+        if not input_path or not Path(input_path).exists():
+            self.file_info_label.setText("0 个文件")
+            return
+        
+        try:
+            path = Path(input_path)
+            if path.is_dir():
+                files = list(path.glob("*"))
+                image_files = [f for f in files if f.suffix.lower() in ['.jpg', '.jpeg', '.png', '.webp', '.bmp', '.tiff']]
+                
+                for f in image_files[:100]:  # 限制显示100个文件
+                    item = QListWidgetItem(f"🖼️ {f.name}")
+                    item.setToolTip(str(f))
+                    self.file_list.addItem(item)
+                
+                count = len(image_files)
+                self.file_info_label.setText(f"{count} 个文件" if count <= 100 else f"{count}+ 个文件")
+        except Exception:
+            self.file_info_label.setText("0 个文件")
     
     def _on_resize_toggled(self, state):
         """尺寸调整开关切换"""
@@ -856,6 +1013,10 @@ class MainWindow(QWidget):
         self.target_size_spin.setEnabled(enabled)
         self.quality_slider.setEnabled(not enabled)
         self.quality_spin.setEnabled(not enabled)
+    
+    def _clear_log(self):
+        """清除日志"""
+        self.log_text.clear()
     
     def _load_history(self):
         """加载历史记录"""
@@ -1033,7 +1194,7 @@ class MainWindow(QWidget):
             
             path, status, orig_size, new_size, details = result
             
-            self.preview_original_label.setText(f"原图: {format_bytes(orig_size)}")
+            self.preview_original_label.setText(f"原始: {format_bytes(orig_size)}")
             self.preview_compressed_label.setText(f"压缩后: {format_bytes(new_size)}")
             
             savings_percent = ((orig_size - new_size) / orig_size * 100) if orig_size > 0 else 0
@@ -1060,8 +1221,13 @@ class MainWindow(QWidget):
         self.cancel_btn.setEnabled(True)
         self.export_btn.setEnabled(False)
         
+        # 重置统计
         self.progress_bar.setValue(0)
         self.stats_label.setText("准备中...")
+        self.success_count_label.setText("0")
+        self.skip_count_label.setText("0")
+        self.error_count_label.setText("0")
+        self.total_savings_label.setText("0 B")
         self.log_text.clear()
         self.log_text.append("[开始] 图片压缩任务")
         
@@ -1111,24 +1277,34 @@ class MainWindow(QWidget):
         """处理结果"""
         self.current_detailed_stats = results
         self._update_stats_table(results)
+        
+        # 更新统计数字
+        success = sum(1 for _, s, _, _, _ in results if s == "成功")
+        skip = sum(1 for _, s, _, _, _ in results if s == "跳过")
+        error = sum(1 for _, s, _, _, _ in results if s == "失败")
+        total_saved = sum(max(0, o - n) for _, s, o, n, _ in results)
+        
+        self.success_count_label.setText(str(success))
+        self.skip_count_label.setText(str(skip))
+        self.error_count_label.setText(str(error))
+        self.total_savings_label.setText(format_bytes(total_saved))
     
     def _update_stats_table(self, results):
         """更新统计表格"""
         self.stats_table.setRowCount(len(results))
         
         for i, (path, status, orig_size, new_size, details) in enumerate(results):
-            self.stats_table.setItem(i, 0, QTableWidgetItem(str(i + 1)))
-            self.stats_table.setItem(i, 1, QTableWidgetItem(path.name))
-            self.stats_table.setItem(i, 2, QTableWidgetItem(status))
-            self.stats_table.setItem(i, 3, QTableWidgetItem(format_bytes(orig_size)))
-            self.stats_table.setItem(i, 4, QTableWidgetItem(format_bytes(new_size)))
+            self.stats_table.setItem(i, 0, QTableWidgetItem(path.name))
             
-            savings = orig_size - new_size
-            savings_pct = (savings / orig_size * 100) if orig_size > 0 else 0
-            self.stats_table.setItem(i, 5, QTableWidgetItem(f"{format_bytes(savings)} ({savings_pct:.1f}%)"))
+            status_item = QTableWidgetItem(status)
+            if status == "成功":
+                status_item.setForeground(QColor(self.SUCCESS))
+            elif status == "失败":
+                status_item.setForeground(QColor("#e74c3c"))
+            self.stats_table.setItem(i, 1, status_item)
             
-            dim_change = details.get('dimensions', '-')
-            self.stats_table.setItem(i, 6, QTableWidgetItem(dim_change))
+            self.stats_table.setItem(i, 2, QTableWidgetItem(format_bytes(orig_size)))
+            self.stats_table.setItem(i, 3, QTableWidgetItem(format_bytes(new_size)))
     
     def _on_finished(self, success_count, skip_count, error_count, total_saved):
         """任务完成"""
@@ -1138,7 +1314,7 @@ class MainWindow(QWidget):
         self.export_btn.setEnabled(True)
         
         self.progress_bar.setValue(100)
-        self.stats_label.setText(f"完成: 成功 {success_count} | 跳过 {skip_count} | 失败 {error_count}")
+        self.stats_label.setText(f"完成!")
         
         self.log_text.append(f"[完成] 任务结束")
         self.log_text.append(f"[统计] 成功: {success_count}, 跳过: {skip_count}, 失败: {error_count}")
