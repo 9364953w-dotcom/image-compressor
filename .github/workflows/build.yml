@@ -12,8 +12,10 @@ on:
 jobs:
   build-macos:
     runs-on: macos-latest
+    timeout-minutes: 30
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout
+      uses: actions/checkout@v4
     
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -27,39 +29,32 @@ jobs:
     
     - name: Build macOS App
       run: |
-        pyinstaller --name="图片压缩工具" \
+        pyinstaller \
+          --name="ImageCompressor" \
           --windowed \
           --icon=icon.icns \
           --add-data "src/resources:src/resources" \
           --clean \
+          --noconfirm \
           src/__main__.py
     
-    - name: Create DMG
+    - name: Rename App
       run: |
-        brew install create-dmg
-        create-dmg \
-          --volname "图片压缩工具" \
-          --window-pos 200 120 \
-          --window-size 800 400 \
-          --icon-size 100 \
-          --app-drop-link 600 185 \
-          "dist/图片压缩工具-macOS.dmg" \
-          "dist/图片压缩工具.app"
-      continue-on-error: true
+        mv "dist/ImageCompressor.app" "dist/图片压缩工具.app"
     
     - name: Upload macOS Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: 图片压缩工具-macOS
-        path: |
-          dist/图片压缩工具.app
-          dist/图片压缩工具-macOS.dmg
+        name: macos-app
+        path: dist/图片压缩工具.app
         retention-days: 30
 
   build-windows:
     runs-on: windows-latest
+    timeout-minutes: 30
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout
+      uses: actions/checkout@v4
     
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -73,12 +68,18 @@ jobs:
     
     - name: Build Windows EXE
       run: |
-        pyinstaller --name="图片压缩工具" `
+        pyinstaller `
+          --name="ImageCompressor" `
           --windowed `
           --icon=icon.png `
           --add-data "src/resources;src/resources" `
           --clean `
+          --noconfirm `
           src/__main__.py
+    
+    - name: Rename EXE folder
+      run: |
+        Rename-Item -Path "dist/ImageCompressor" -NewName "图片压缩工具"
     
     - name: Create ZIP
       run: |
@@ -87,36 +88,34 @@ jobs:
     - name: Upload Windows Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: 图片压缩工具-Windows
-        path: |
-          dist/图片压缩工具
-          dist/图片压缩工具-Windows.zip
+        name: windows-exe
+        path: dist/图片压缩工具-Windows.zip
         retention-days: 30
 
-  release:
+  create-release:
     needs: [build-macos, build-windows]
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
     - name: Download macOS Artifact
       uses: actions/download-artifact@v4
       with:
-        name: 图片压缩工具-macOS
+        name: macos-app
         path: ./macos
     
     - name: Download Windows Artifact
       uses: actions/download-artifact@v4
       with:
-        name: 图片压缩工具-Windows
+        name: windows-exe
         path: ./windows
     
     - name: Create Release
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       with:
         files: |
-          ./macos/图片压缩工具-macOS.dmg
           ./windows/图片压缩工具-Windows.zip
-        draft: false
-        prerelease: false
+        fail_on_unmatched_paths: false
+        generate_release_notes: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
