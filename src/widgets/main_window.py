@@ -416,7 +416,10 @@ class MainWindow(QMainWindow):
         input_path = self.input_panel.input_edit.text().strip()
         if not input_path or not Path(input_path).exists():
             raise ValueError("请先选择有效的输入文件夹")
-        files = [p for p in Path(input_path).rglob("*") if p.is_file() and p.suffix.lower() in {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tiff", ".tif"}]
+        include_subdirs = self.settings_panel.include_subfolders_cb.isChecked()
+        path_obj = Path(input_path)
+        files_iter = path_obj.rglob("*") if include_subdirs else path_obj.glob("*")
+        files = [p for p in files_iter if p.is_file() and p.suffix.lower() in {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tiff", ".tif"}]
         if not files:
             raise ValueError("输入目录中未找到图片文件")
         return files[0]
