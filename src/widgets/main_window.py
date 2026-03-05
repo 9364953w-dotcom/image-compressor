@@ -1,5 +1,5 @@
 """
-主窗口模块 - 现代深色玻璃拟态风格
+主窗口模块 - VS Code 风格设计
 """
 
 from pathlib import Path
@@ -12,10 +12,11 @@ from PyQt5.QtWidgets import (
     QGroupBox, QFormLayout, QComboBox, QLineEdit, QTableWidget,
     QTableWidgetItem, QHeaderView, QTabWidget, QSplitter,
     QAbstractItemView, QMenuBar, QMenu, QAction, QFrame,
-    QSizePolicy, QSpacerItem
+    QSizePolicy, QSpacerItem, QStackedWidget, QToolButton,
+    QScrollArea
 )
 from PyQt5.QtCore import Qt, QThread, QSize
-from PyQt5.QtGui import QFont, QColor, QPalette, QLinearGradient, QBrush, QIcon
+from PyQt5.QtGui import QFont, QColor, QPalette, QIcon
 
 from src.config import (
     APP_NAME, __version__, DEFAULT_QUALITY, DEFAULT_MIN_SIZE_MB,
@@ -30,7 +31,22 @@ from src.core.compressor import get_exif_info, compress_image
 
 
 class MainWindow(QWidget):
-    """图片压缩工具主窗口 - 现代深色玻璃拟态风格"""
+    """图片压缩工具主窗口 - VS Code 风格"""
+    
+    # VS Code Dark+ 主题颜色
+    BG_PRIMARY = "#1e1e1e"        # 主背景
+    BG_SECONDARY = "#252526"      # 侧边栏背景
+    BG_TERTIARY = "#2d2d30"       # 活动栏/面板背景
+    BORDER = "#3c3c3c"            # 边框
+    BORDER_ACTIVE = "#007acc"     # 活动边框（蓝色）
+    TEXT_PRIMARY = "#cccccc"      # 主文字
+    TEXT_SECONDARY = "#858585"    # 次要文字
+    TEXT_ACTIVE = "#ffffff"       # 活动文字
+    ACCENT = "#007acc"            # 强调色（蓝色）
+    ACCENT_HOVER = "#1177bb"      # 悬停色
+    BUTTON_BG = "#0e639c"         # 按钮背景
+    BUTTON_HOVER = "#1177bb"      # 按钮悬停
+    INPUT_BG = "#3c3c3c"          # 输入框背景
     
     def __init__(self):
         super().__init__()
@@ -45,472 +61,460 @@ class MainWindow(QWidget):
         self.setMinimumSize(1200, 800)
         self.resize(1400, 900)
         
-        # 应用现代深色样式
-        self._setup_modern_style()
+        self._setup_vscode_style()
         self._setup_ui()
         self._connect_signals()
         self._load_history()
         self._load_presets()
     
-    def _setup_modern_style(self):
-        """设置现代深色玻璃拟态风格 - 直角版本"""
-        self.setStyleSheet("""
-            /* 全局样式 - 深黑背景 */
-            QWidget {
-                background-color: #0d0d12;
-                color: #e8e8ed;
+    def _setup_vscode_style(self):
+        """设置 VS Code 风格样式"""
+        self.setStyleSheet(f"""
+            /* 全局样式 */
+            QWidget {{
+                background-color: {self.BG_PRIMARY};
+                color: {self.TEXT_PRIMARY};
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
                 font-size: 13px;
-            }
+                border: none;
+                outline: none;
+            }}
             
-            /* 玻璃拟态卡片 - 无圆角 */
-            QGroupBox {
-                background-color: #1a1a24;
-                border: 1px solid #333;
+            /* 侧边栏样式 */
+            QGroupBox {{
+                background-color: {self.BG_SECONDARY};
+                border: 1px solid {self.BORDER};
                 border-radius: 0px;
-                margin-top: 8px;
+                margin: 0px;
                 padding: 12px;
-            }
+                font-weight: normal;
+            }}
             
-            QGroupBox::title {
-                color: #a29bfe;
+            QGroupBox::title {{
+                color: {self.TEXT_SECONDARY};
                 subcontrol-origin: margin;
                 left: 12px;
                 padding: 0 6px;
-                font-size: 12px;
-            }
+                font-size: 11px;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }}
             
-            /* 输入框 - 无圆角 */
-            QLineEdit {
-                background-color: #252530;
-                border: 1px solid #444;
+            /* 输入框 */
+            QLineEdit {{
+                background-color: {self.INPUT_BG};
+                border: 1px solid {self.BORDER};
                 border-radius: 0px;
-                padding: 8px 10px;
-                color: #ffffff;
+                padding: 6px 10px;
+                color: {self.TEXT_PRIMARY};
                 font-size: 13px;
-            }
+                selection-background-color: {self.ACCENT};
+            }}
             
-            QLineEdit:focus {
-                border-color: #6c5ce7;
-            }
+            QLineEdit:focus {{
+                border-color: {self.ACCENT};
+            }}
             
-            QLineEdit::placeholder {
-                color: #666;
-            }
+            QLineEdit::placeholder {{
+                color: {self.TEXT_SECONDARY};
+            }}
             
-            /* 主按钮 - 无圆角 */
-            QPushButton {
-                background-color: #6c5ce7;
+            /* 主按钮 - 蓝色 */
+            QPushButton {{
+                background-color: {self.BUTTON_BG};
                 color: white;
                 border: none;
                 border-radius: 0px;
-                padding: 8px 12px;
+                padding: 6px 14px;
                 font-size: 13px;
-            }
+            }}
             
-            QPushButton:hover {
-                background-color: #7d6cf0;
-            }
+            QPushButton:hover {{
+                background-color: {self.BUTTON_HOVER};
+            }}
             
-            QPushButton:pressed {
-                background-color: #5b4dd6;
-            }
+            QPushButton:pressed {{
+                background-color: {self.ACCENT};
+            }}
             
-            QPushButton:disabled {
-                background-color: #333;
-                color: #666;
-            }
+            QPushButton:disabled {{
+                background-color: {self.BG_TERTIARY};
+                color: {self.TEXT_SECONDARY};
+            }}
             
             /* 次要按钮 */
-            QPushButton#secondaryBtn {
-                background-color: #2a2a35;
-                border: 1px solid #444;
-                color: #e8e8ed;
-            }
+            QPushButton#secondaryBtn {{
+                background-color: {self.BG_TERTIARY};
+                border: 1px solid {self.BORDER};
+                color: {self.TEXT_PRIMARY};
+            }}
             
-            QPushButton#secondaryBtn:hover {
-                background-color: #353540;
-                border-color: #555;
-            }
+            QPushButton#secondaryBtn:hover {{
+                background-color: #3c3c3c;
+                border-color: {self.TEXT_SECONDARY};
+            }}
             
-            /* 复选框 - 带打勾样式 */
-            QCheckBox {
-                color: #e8e8ed;
+            /* 复选框 */
+            QCheckBox {{
+                color: {self.TEXT_PRIMARY};
                 font-size: 13px;
                 spacing: 8px;
                 background: transparent;
-                border: none;
-            }
+            }}
             
-            QCheckBox::indicator {
+            QCheckBox::indicator {{
                 width: 16px;
                 height: 16px;
                 border-radius: 0px;
-                border: 2px solid #6c5ce7;
-                background-color: transparent;
-            }
+                border: 1px solid {self.BORDER};
+                background-color: {self.INPUT_BG};
+            }}
             
-            QCheckBox::indicator:checked {
-                background-color: #6c5ce7;
+            QCheckBox::indicator:checked {{
+                background-color: {self.BUTTON_BG};
+                border-color: {self.BUTTON_BG};
                 image: url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAiIGhlaWdodD0iMTAiIHZpZXdCb3g9IjAgMCAxMCAxMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNOCAyTDQgN0wyIDUiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PC9zdmc+);
-            }
+            }}
             
-            QCheckBox::indicator:hover {
-                border-color: #a29bfe;
-            }
+            QCheckBox::indicator:hover {{
+                border-color: {self.TEXT_SECONDARY};
+            }}
             
-            QCheckBox::indicator:unchecked:hover {
-                background-color: rgba(108, 92, 231, 0.1);
-            }
-            
-            /* 下拉框 - 无圆角 */
-            QComboBox {
-                background-color: #252530;
-                border: 1px solid #444;
+            /* 下拉框 */
+            QComboBox {{
+                background-color: {self.INPUT_BG};
+                border: 1px solid {self.BORDER};
                 border-radius: 0px;
-                padding: 8px 10px;
-                color: #ffffff;
+                padding: 6px 10px;
+                color: {self.TEXT_PRIMARY};
                 min-width: 100px;
-            }
+            }}
             
-            QComboBox:hover {
-                border-color: #6c5ce7;
-            }
+            QComboBox:hover {{
+                border-color: {self.TEXT_SECONDARY};
+            }}
             
-            QComboBox::drop-down {
+            QComboBox::drop-down {{
                 border: none;
-                width: 24px;
-            }
+                width: 20px;
+            }}
             
-            QComboBox QAbstractItemView {
-                background-color: #1a1a24;
-                border: 1px solid #444;
-                selection-background-color: #6c5ce7;
-            }
+            QComboBox QAbstractItemView {{
+                background-color: {self.BG_SECONDARY};
+                border: 1px solid {self.BORDER};
+                selection-background-color: {self.ACCENT};
+                outline: none;
+            }}
             
-            /* 滑块 - 优化样式 */
-            QSlider::groove:horizontal {
-                height: 6px;
-                background-color: #252530;
-                border: 1px solid #444;
-            }
+            /* 滑块 - VS Code 风格 */
+            QSlider::groove:horizontal {{
+                height: 4px;
+                background-color: {self.INPUT_BG};
+            }}
             
-            QSlider::sub-page:horizontal {
-                background-color: #6c5ce7;
-            }
+            QSlider::sub-page:horizontal {{
+                background-color: {self.ACCENT};
+            }}
             
-            QSlider::handle:horizontal {
-                width: 16px;
-                height: 16px;
-                margin: -6px 0;
-                background-color: #fff;
-                border: 1px solid #888;
-            }
+            QSlider::handle:horizontal {{
+                width: 12px;
+                height: 12px;
+                margin: -4px 0;
+                background-color: white;
+                border: 1px solid {self.BORDER};
+            }}
             
-            QSlider::handle:horizontal:hover {
-                background-color: #a29bfe;
-                border-color: #6c5ce7;
-            }
+            QSlider::handle:horizontal:hover {{
+                background-color: {self.ACCENT};
+                border-color: {self.ACCENT};
+            }}
             
-            /* 数值框 - 带箭头按钮 */
-            QSpinBox, QDoubleSpinBox {
-                background-color: #252530;
-                border: 1px solid #444;
+            /* 数值框 */
+            QSpinBox, QDoubleSpinBox {{
+                background-color: {self.INPUT_BG};
+                border: 1px solid {self.BORDER};
                 border-radius: 0px;
-                color: #ffffff;
-            }
+                padding: 4px 8px;
+                padding-right: 18px;
+                color: {self.TEXT_PRIMARY};
+            }}
             
-            QSpinBox::up-button, QDoubleSpinBox::up-button {
+            QSpinBox::up-button, QDoubleSpinBox::up-button {{
                 subcontrol-origin: border;
                 subcontrol-position: top right;
                 width: 16px;
                 height: 50%;
-                border-left: 1px solid #444;
-                border-bottom: 1px solid #444;
-                background-color: #2a2a35;
-            }
+                border-left: 1px solid {self.BORDER};
+                background-color: transparent;
+            }}
             
-            QSpinBox::down-button, QDoubleSpinBox::down-button {
+            QSpinBox::down-button, QDoubleSpinBox::down-button {{
                 subcontrol-origin: border;
                 subcontrol-position: bottom right;
                 width: 16px;
                 height: 50%;
-                border-left: 1px solid #444;
-                background-color: #2a2a35;
-            }
+                border-left: 1px solid {self.BORDER};
+                background-color: transparent;
+            }}
             
-            QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover {
-                background-color: #6c5ce7;
-            }
+            QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover,
+            QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover {{
+                background-color: {self.BG_TERTIARY};
+            }}
             
-            QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover {
-                background-color: #6c5ce7;
-            }
-            
-            QSpinBox::up-arrow {
+            QSpinBox::up-arrow {{
                 image: none;
-                border-left: 4px solid transparent;
-                border-right: 4px solid transparent;
-                border-bottom: 5px solid #888;
-                width: 0px;
-                height: 0px;
-            }
+                border-left: 3px solid transparent;
+                border-right: 3px solid transparent;
+                border-bottom: 4px solid {self.TEXT_SECONDARY};
+            }}
             
-            QSpinBox::down-arrow {
+            QSpinBox::down-arrow {{
                 image: none;
-                border-left: 4px solid transparent;
-                border-right: 4px solid transparent;
-                border-top: 5px solid #888;
-                width: 0px;
-                height: 0px;
-            }
-            
-            QDoubleSpinBox::up-arrow {
-                image: none;
-                border-left: 4px solid transparent;
-                border-right: 4px solid transparent;
-                border-bottom: 5px solid #888;
-                width: 0px;
-                height: 0px;
-            }
-            
-            QDoubleSpinBox::down-arrow {
-                image: none;
-                border-left: 4px solid transparent;
-                border-right: 4px solid transparent;
-                border-top: 5px solid #888;
-                width: 0px;
-                height: 0px;
-            }
+                border-left: 3px solid transparent;
+                border-right: 3px solid transparent;
+                border-top: 4px solid {self.TEXT_SECONDARY};
+            }}
             
             /* 进度条 */
-            QProgressBar {
-                background-color: #252530;
+            QProgressBar {{
+                background-color: {self.INPUT_BG};
+                border: 1px solid {self.BORDER};
                 border-radius: 0px;
                 text-align: center;
-                height: 16px;
-                color: #e8e8ed;
+                height: 18px;
+                color: {self.TEXT_PRIMARY};
                 font-size: 11px;
-                border: 1px solid #444;
-            }
+            }}
             
-            QProgressBar::chunk {
-                background-color: #6c5ce7;
-                border-radius: 0px;
-            }
+            QProgressBar::chunk {{
+                background-color: {self.ACCENT};
+            }}
             
-            /* 标签页 */
-            QTabWidget::pane {
+            /* 标签页 - VS Code 风格 */
+            QTabWidget::pane {{
                 border: none;
-                background-color: transparent;
-            }
+                background-color: {self.BG_PRIMARY};
+            }}
             
-            QTabBar::tab {
-                background-color: #1a1a24;
-                border: 1px solid #333;
-                color: #8b8b9b;
+            QTabBar::tab {{
+                background-color: {self.BG_SECONDARY};
+                border: 1px solid {self.BORDER};
+                border-bottom: none;
+                color: {self.TEXT_SECONDARY};
                 padding: 8px 16px;
-                margin-right: 4px;
+                margin-right: 2px;
                 border-radius: 0px;
-            }
+            }}
             
-            QTabBar::tab:selected {
-                background-color: #6c5ce7;
-                border-color: #6c5ce7;
-                color: #ffffff;
-            }
+            QTabBar::tab:selected {{
+                background-color: {self.BG_PRIMARY};
+                border-top: 2px solid {self.ACCENT};
+                color: {self.TEXT_ACTIVE};
+            }}
+            
+            QTabBar::tab:hover:!selected {{
+                background-color: {self.BG_TERTIARY};
+                color: {self.TEXT_PRIMARY};
+            }}
             
             /* 文本框 */
-            QTextEdit {
-                background-color: #1a1a24;
-                border: 1px solid #444;
+            QTextEdit {{
+                background-color: {self.BG_PRIMARY};
+                border: 1px solid {self.BORDER};
                 border-radius: 0px;
                 padding: 10px;
-                color: #e8e8ed;
+                color: {self.TEXT_PRIMARY};
+                font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
                 font-size: 12px;
-            }
+            }}
             
             /* 表格 */
-            QTableWidget {
-                background-color: #1a1a24;
-                border: 1px solid #444;
-                border-radius: 0px;
-                gridline-color: #333;
-            }
+            QTableWidget {{
+                background-color: {self.BG_PRIMARY};
+                border: 1px solid {self.BORDER};
+                gridline-color: {self.BORDER};
+            }}
             
-            QTableWidget::item {
+            QTableWidget::item {{
                 padding: 8px;
-                color: #e8e8ed;
-                border-bottom: 1px solid #333;
-            }
+                color: {self.TEXT_PRIMARY};
+                border-bottom: 1px solid {self.BORDER};
+            }}
             
-            QTableWidget::item:selected {
-                background-color: #6c5ce7;
-                color: #ffffff;
-            }
+            QTableWidget::item:selected {{
+                background-color: {self.ACCENT};
+                color: white;
+            }}
             
-            QHeaderView::section {
-                background-color: #252530;
-                color: #a29bfe;
-                padding: 10px;
+            QHeaderView::section {{
+                background-color: {self.BG_SECONDARY};
+                color: {self.TEXT_PRIMARY};
+                padding: 8px;
                 border: none;
-                border-right: 1px solid #333;
+                border-right: 1px solid {self.BORDER};
                 font-size: 12px;
-            }
+                font-weight: normal;
+            }}
             
             /* 标签 */
-            QLabel {
-                color: #e8e8ed;
+            QLabel {{
+                color: {self.TEXT_PRIMARY};
                 background: transparent;
-            }
+            }}
+            
+            /* 分隔线 */
+            QFrame[frameShape="4"] {{
+                color: {self.BORDER};
+            }}
             
             /* 菜单栏 */
-            QMenuBar {
-                background-color: transparent;
-            }
+            QMenuBar {{
+                background-color: {self.BG_SECONDARY};
+                border-bottom: 1px solid {self.BORDER};
+            }}
             
-            QMenuBar::item {
+            QMenuBar::item {{
                 background-color: transparent;
                 padding: 6px 12px;
-                color: #8b8b9b;
-            }
+                color: {self.TEXT_PRIMARY};
+            }}
             
-            QMenuBar::item:selected {
-                background-color: #6c5ce7;
-                color: #ffffff;
-                border-radius: 0px;
-            }
+            QMenuBar::item:selected {{
+                background-color: {self.BG_TERTIARY};
+                color: {self.TEXT_ACTIVE};
+            }}
             
-            QMenu {
-                background-color: #1a1a24;
-                border: 1px solid #444;
-                border-radius: 0px;
+            QMenu {{
+                background-color: {self.BG_SECONDARY};
+                border: 1px solid {self.BORDER};
                 padding: 4px;
-            }
+            }}
             
-            QMenu::item {
+            QMenu::item {{
                 padding: 8px 16px;
-                border-radius: 0px;
-                color: #e8e8ed;
-            }
+                color: {self.TEXT_PRIMARY};
+            }}
             
-            QMenu::item:selected {
-                background-color: #6c5ce7;
-            }
+            QMenu::item:selected {{
+                background-color: {self.ACCENT};
+                color: white;
+            }}
+            
+            /* 滚动条 */
+            QScrollBar:vertical {{
+                background-color: {self.BG_SECONDARY};
+                width: 14px;
+                border-left: 1px solid {self.BORDER};
+            }}
+            
+            QScrollBar::handle:vertical {{
+                background-color: {self.INPUT_BG};
+                min-height: 30px;
+            }}
+            
+            QScrollBar::handle:vertical:hover {{
+                background-color: {self.TEXT_SECONDARY};
+            }}
+            
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+                height: 0px;
+            }}
         """)
     
     def _setup_ui(self):
-        """设置用户界面 - 现代布局"""
-        main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(24, 24, 24, 24)
-        main_layout.setSpacing(20)
+        """设置用户界面 - VS Code 风格三栏布局"""
+        main_layout = QHBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
         
-        # ========== 顶部标题栏 ==========
-        header = QWidget()
-        header_layout = QHBoxLayout(header)
-        header_layout.setContentsMargins(0, 0, 0, 0)
-        
-        # 左侧标题
-        title_container = QWidget()
-        title_vlayout = QVBoxLayout(title_container)
-        title_vlayout.setSpacing(4)
-        title_vlayout.setContentsMargins(0, 0, 0, 0)
-        
-        title_label = QLabel(APP_NAME)
-        title_label.setObjectName("titleLabel")
-        title_font = QFont()
-        title_font.setPointSize(24)
-        title_font.setBold(True)
-        title_label.setFont(title_font)
-        title_label.setStyleSheet("color: #ffffff; font-weight: 700;")
-        title_vlayout.addWidget(title_label)
-        
-        version_label = QLabel(f"v{__version__} • 智能批量图片压缩")
-        version_label.setObjectName("subtitleLabel")
-        version_label.setStyleSheet("color: #6b6b7b; font-size: 13px;")
-        title_vlayout.addWidget(version_label)
-        
-        header_layout.addWidget(title_container)
-        header_layout.addStretch()
-        
-        # 右侧菜单按钮
-        about_btn = QPushButton("关于")
-        about_btn.setObjectName("secondaryBtn")
-        about_btn.setFixedWidth(60)
-        about_btn.clicked.connect(self._show_about)
-        header_layout.addWidget(about_btn)
-        
-        main_layout.addWidget(header)
-        
-        # ========== 主内容区（三栏布局）==========
-        content = QHBoxLayout()
-        content.setSpacing(20)
-        
-        # 左侧面板 - 输入和预设
-        left_panel = QWidget()
-        left_layout = QVBoxLayout(left_panel)
-        left_layout.setSpacing(16)
+        # ========== 左侧边栏 ==========
+        left_sidebar = QWidget()
+        left_sidebar.setFixedWidth(250)
+        left_sidebar.setStyleSheet(f"background-color: {self.BG_SECONDARY}; border-right: 1px solid {self.BORDER};")
+        left_layout = QVBoxLayout(left_sidebar)
         left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(0)
         
-        # 路径设置卡片
-        path_card = QGroupBox("📁 输入输出")
-        path_layout = QVBoxLayout(path_card)
-        path_layout.setSpacing(12)
+        # 标题
+        header = QWidget()
+        header.setStyleSheet(f"background-color: {self.BG_SECONDARY}; border-bottom: 1px solid {self.BORDER};")
+        header_layout = QHBoxLayout(header)
+        header_layout.setContentsMargins(12, 8, 12, 8)
         
-        # 输入路径行
+        title_label = QLabel("EXPLORER")
+        title_label.setStyleSheet(f"color: {self.TEXT_SECONDARY}; font-size: 11px; font-weight: bold;")
+        header_layout.addWidget(title_label)
+        left_layout.addWidget(header)
+        
+        # 滚动区域
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        
+        scroll_content = QWidget()
+        scroll_layout = QVBoxLayout(scroll_content)
+        scroll_layout.setContentsMargins(12, 12, 12, 12)
+        scroll_layout.setSpacing(16)
+        
+        # 输入输出组
+        io_group = self._create_vscode_group("输入输出")
+        io_layout = QVBoxLayout(io_group)
+        io_layout.setSpacing(8)
+        
+        # 输入路径
         input_label = QLabel("输入文件夹")
-        input_label.setStyleSheet("color: #8b8b9b; font-size: 12px;")
-        path_layout.addWidget(input_label)
+        input_label.setStyleSheet(f"color: {self.TEXT_SECONDARY}; font-size: 12px;")
+        io_layout.addWidget(input_label)
         
         input_row = QHBoxLayout()
         self.input_edit = DragDropLineEdit()
-        self.input_edit.setPlaceholderText("拖拽或选择输入文件夹...")
-        self.input_edit.setMinimumHeight(36)
+        self.input_edit.setPlaceholderText("选择或拖拽文件夹...")
         input_row.addWidget(self.input_edit)
         
-        browse_input = QPushButton("浏览")
-        browse_input.setFixedWidth(70)
-        browse_input.setMinimumWidth(60)
+        browse_input = QPushButton("...")
+        browse_input.setFixedWidth(32)
+        browse_input.setToolTip("浏览")
         browse_input.clicked.connect(self._select_input)
         browse_input.setObjectName("secondaryBtn")
         input_row.addWidget(browse_input)
-        path_layout.addLayout(input_row)
+        io_layout.addLayout(input_row)
         
-        # 输出路径行
+        # 输出路径
         output_label = QLabel("输出文件夹")
-        output_label.setStyleSheet("color: #8b8b9b; font-size: 12px;")
-        path_layout.addWidget(output_label)
+        output_label.setStyleSheet(f"color: {self.TEXT_SECONDARY}; font-size: 12px;")
+        io_layout.addWidget(output_label)
         
         output_row = QHBoxLayout()
         self.output_edit = DragDropLineEdit()
-        self.output_edit.setPlaceholderText("留空则覆盖原文件...")
-        self.output_edit.setMinimumHeight(36)
+        self.output_edit.setPlaceholderText("留空则覆盖原文件")
         output_row.addWidget(self.output_edit)
         
-        browse_output = QPushButton("浏览")
-        browse_output.setFixedWidth(70)
-        browse_output.setMinimumWidth(60)
+        browse_output = QPushButton("...")
+        browse_output.setFixedWidth(32)
+        browse_output.setToolTip("浏览")
         browse_output.clicked.connect(self._select_output)
         browse_output.setObjectName("secondaryBtn")
         output_row.addWidget(browse_output)
-        path_layout.addLayout(output_row)
+        io_layout.addLayout(output_row)
         
-        # 历史记录行
-        history_row = QHBoxLayout()
+        # 历史记录
         history_label = QLabel("历史记录")
-        history_label.setStyleSheet("color: #8b8b9b; font-size: 12px;")
-        history_row.addWidget(history_label)
+        history_label.setStyleSheet(f"color: {self.TEXT_SECONDARY}; font-size: 12px;")
+        io_layout.addWidget(history_label)
         
         self.history_combo = QComboBox()
         self.history_combo.setPlaceholderText("选择历史记录...")
         self.history_combo.currentTextChanged.connect(self._on_history_selected)
-        history_row.addWidget(self.history_combo, 1)
-        path_layout.addLayout(history_row)
+        io_layout.addWidget(self.history_combo)
         
-        left_layout.addWidget(path_card)
+        scroll_layout.addWidget(io_group)
         
-        # 预设配置卡片
-        preset_card = QGroupBox("🎯 预设配置")
-        preset_layout = QVBoxLayout(preset_card)
+        # 预设组
+        preset_group = self._create_vscode_group("预设配置")
+        preset_layout = QVBoxLayout(preset_group)
+        preset_layout.setSpacing(8)
         
         preset_row = QHBoxLayout()
         self.preset_combo = QComboBox()
@@ -519,43 +523,63 @@ class MainWindow(QWidget):
         preset_row.addWidget(self.preset_combo)
         
         save_preset_btn = QPushButton("保存")
+        save_preset_btn.setFixedWidth(50)
         save_preset_btn.setObjectName("secondaryBtn")
-        save_preset_btn.setFixedWidth(70)
-        save_preset_btn.setMinimumWidth(60)
         save_preset_btn.clicked.connect(self._save_preset)
         preset_row.addWidget(save_preset_btn)
-        
         preset_layout.addLayout(preset_row)
         
         self.preset_desc_label = QLabel("")
-        self.preset_desc_label.setStyleSheet("color: #6b6b7b; font-size: 12px;")
+        self.preset_desc_label.setStyleSheet(f"color: {self.TEXT_SECONDARY}; font-size: 11px;")
         preset_layout.addWidget(self.preset_desc_label)
         
-        left_layout.addWidget(preset_card)
-        left_layout.addStretch()
+        scroll_layout.addWidget(preset_group)
+        scroll_layout.addStretch()
         
-        content.addWidget(left_panel, 1)
+        scroll.setWidget(scroll_content)
+        left_layout.addWidget(scroll)
         
-        # 中间面板 - 压缩选项
+        main_layout.addWidget(left_sidebar)
+        
+        # ========== 中间主区域 ==========
         center_panel = QWidget()
         center_layout = QVBoxLayout(center_panel)
+        center_layout.setContentsMargins(20, 16, 20, 16)
         center_layout.setSpacing(16)
-        center_layout.setContentsMargins(0, 0, 0, 0)
         
-        # 压缩选项卡片
-        options_card = QGroupBox("📤 输出设置")
-        options_layout = QVBoxLayout(options_card)
-        options_layout.setSpacing(16)
+        # 顶部标题栏
+        top_bar = QWidget()
+        top_layout = QHBoxLayout(top_bar)
+        top_layout.setContentsMargins(0, 0, 0, 0)
         
-        # 输出格式和最小大小
+        title = QLabel(f"{APP_NAME}  v{__version__}")
+        title.setStyleSheet(f"color: {self.TEXT_ACTIVE}; font-size: 18px; font-weight: 600;")
+        top_layout.addWidget(title)
+        
+        top_layout.addStretch()
+        
+        about_btn = QPushButton("关于")
+        about_btn.setFixedWidth(60)
+        about_btn.setObjectName("secondaryBtn")
+        about_btn.clicked.connect(self._show_about)
+        top_layout.addWidget(about_btn)
+        
+        center_layout.addWidget(top_bar)
+        
+        # 输出设置组
+        settings_group = self._create_vscode_group("输出设置")
+        settings_layout = QVBoxLayout(settings_group)
+        settings_layout.setSpacing(12)
+        
+        # 第一行：格式和最小大小
         row1 = QHBoxLayout()
         row1.addWidget(QLabel("输出格式:"))
         self.format_combo = QComboBox()
         self.format_combo.addItems(["保持原格式", "JPG", "PNG", "WebP"])
-        self.format_combo.setFixedWidth(140)
+        self.format_combo.setFixedWidth(120)
         row1.addWidget(self.format_combo)
         
-        row1.addSpacing(20)
+        row1.addSpacing(30)
         
         row1.addWidget(QLabel("最小大小:"))
         self.min_size_spin = QDoubleSpinBox()
@@ -563,13 +587,13 @@ class MainWindow(QWidget):
         self.min_size_spin.setDecimals(1)
         self.min_size_spin.setValue(DEFAULT_MIN_SIZE_MB)
         self.min_size_spin.setSuffix(" MB")
-        self.min_size_spin.setFixedWidth(110)
+        self.min_size_spin.setFixedWidth(100)
         row1.addWidget(self.min_size_spin)
         row1.addStretch()
         
-        options_layout.addLayout(row1)
+        settings_layout.addLayout(row1)
         
-        # 压缩质量
+        # 第二行：压缩质量
         quality_row = QHBoxLayout()
         quality_row.addWidget(QLabel("压缩质量:"))
         
@@ -582,141 +606,122 @@ class MainWindow(QWidget):
         self.quality_spin.setRange(1, 100)
         self.quality_spin.setValue(DEFAULT_QUALITY)
         self.quality_spin.setSuffix("%")
-        self.quality_spin.setFixedWidth(80)
+        self.quality_spin.setFixedWidth(60)
         quality_row.addWidget(self.quality_spin)
         
-        options_layout.addLayout(quality_row)
+        settings_layout.addLayout(quality_row)
         
-        # 尺寸调整
-        resize_group = QWidget()
-        resize_group.setStyleSheet("background: transparent;")
-        resize_layout = QHBoxLayout(resize_group)
-        resize_layout.setContentsMargins(0, 0, 0, 0)
-        
+        # 第三行：尺寸调整
+        resize_row = QHBoxLayout()
         self.resize_cb = QCheckBox("调整尺寸")
         self.resize_cb.stateChanged.connect(self._on_resize_toggled)
-        resize_layout.addWidget(self.resize_cb)
+        resize_row.addWidget(self.resize_cb)
         
-        resize_layout.addWidget(QLabel("最大宽:"))
+        resize_row.addWidget(QLabel("最大宽:"))
         self.max_width_spin = QSpinBox()
         self.max_width_spin.setRange(0, 10000)
         self.max_width_spin.setValue(0)
         self.max_width_spin.setSuffix(" px")
-        self.max_width_spin.setFixedWidth(90)
+        self.max_width_spin.setFixedWidth(80)
         self.max_width_spin.setEnabled(False)
-        resize_layout.addWidget(self.max_width_spin)
+        resize_row.addWidget(self.max_width_spin)
         
-        resize_layout.addWidget(QLabel("最大高:"))
+        resize_row.addWidget(QLabel("最大高:"))
         self.max_height_spin = QSpinBox()
         self.max_height_spin.setRange(0, 10000)
         self.max_height_spin.setValue(0)
         self.max_height_spin.setSuffix(" px")
-        self.max_height_spin.setFixedWidth(90)
+        self.max_height_spin.setFixedWidth(80)
         self.max_height_spin.setEnabled(False)
-        resize_layout.addWidget(self.max_height_spin)
+        resize_row.addWidget(self.max_height_spin)
         
         self.keep_ratio_cb = QCheckBox("保持比例")
         self.keep_ratio_cb.setChecked(True)
         self.keep_ratio_cb.setEnabled(False)
-        resize_layout.addWidget(self.keep_ratio_cb)
-        resize_layout.addStretch()
+        resize_row.addWidget(self.keep_ratio_cb)
+        resize_row.addStretch()
         
-        options_layout.addWidget(resize_group)
+        settings_layout.addLayout(resize_row)
         
-        # 智能压缩
-        smart_group = QWidget()
-        smart_group.setStyleSheet("background: transparent;")
-        smart_layout = QHBoxLayout(smart_group)
-        smart_layout.setContentsMargins(0, 0, 0, 0)
-        
+        # 第四行：智能压缩
+        smart_row = QHBoxLayout()
         self.smart_cb = QCheckBox("智能压缩")
         self.smart_cb.stateChanged.connect(self._on_smart_toggled)
-        smart_layout.addWidget(self.smart_cb)
+        smart_row.addWidget(self.smart_cb)
         
-        smart_layout.addWidget(QLabel("目标大小:"))
+        smart_row.addWidget(QLabel("目标大小:"))
         self.target_size_spin = QSpinBox()
         self.target_size_spin.setRange(10, 10000)
         self.target_size_spin.setValue(200)
         self.target_size_spin.setSuffix(" KB")
-        self.target_size_spin.setFixedWidth(90)
+        self.target_size_spin.setFixedWidth(80)
         self.target_size_spin.setEnabled(False)
-        smart_layout.addWidget(self.target_size_spin)
-        smart_layout.addStretch()
+        smart_row.addWidget(self.target_size_spin)
+        smart_row.addStretch()
         
-        options_layout.addWidget(smart_group)
+        settings_layout.addLayout(smart_row)
         
-        # EXIF 选项
-        exif_group = QWidget()
-        exif_group.setStyleSheet("background: transparent;")
-        exif_layout = QHBoxLayout(exif_group)
-        exif_layout.setContentsMargins(0, 0, 0, 0)
-        
+        # 第五行：EXIF 选项
+        exif_row = QHBoxLayout()
         self.keep_exif_cb = QCheckBox("保留 EXIF")
         self.keep_exif_cb.setChecked(True)
-        exif_layout.addWidget(self.keep_exif_cb)
+        exif_row.addWidget(self.keep_exif_cb)
         
         self.auto_rotate_cb = QCheckBox("自动旋转")
         self.auto_rotate_cb.setChecked(True)
-        exif_layout.addWidget(self.auto_rotate_cb)
+        exif_row.addWidget(self.auto_rotate_cb)
         
         exif_btn = QPushButton("查看 EXIF")
-        exif_btn.setObjectName("secondaryBtn")
         exif_btn.setFixedWidth(80)
+        exif_btn.setObjectName("secondaryBtn")
         exif_btn.clicked.connect(self._show_exif)
-        exif_layout.addWidget(exif_btn)
-        exif_layout.addStretch()
+        exif_row.addWidget(exif_btn)
+        exif_row.addStretch()
         
-        options_layout.addWidget(exif_group)
+        settings_layout.addLayout(exif_row)
         
-        center_layout.addWidget(options_card)
+        center_layout.addWidget(settings_group)
         
-        # 预览卡片
-        preview_card = QGroupBox("👁️ 压缩预览")
-        preview_layout = QVBoxLayout(preview_card)
+        # 预览组
+        preview_group = self._create_vscode_group("压缩预览")
+        preview_layout = QVBoxLayout(preview_group)
+        preview_layout.setSpacing(10)
         
         preview_btn_row = QHBoxLayout()
         self.preview_btn = QPushButton("预览第一张图片")
-        self.preview_btn.setMinimumWidth(140)
+        self.preview_btn.setFixedWidth(140)
         self.preview_btn.clicked.connect(self._preview_compression)
         preview_btn_row.addWidget(self.preview_btn)
         preview_btn_row.addStretch()
         preview_layout.addLayout(preview_btn_row)
         
-        preview_result = QHBoxLayout()
+        preview_info = QHBoxLayout()
         self.preview_original_label = QLabel("原图: -")
-        self.preview_original_label.setStyleSheet("color: #6b6b7b;")
-        preview_result.addWidget(self.preview_original_label)
+        self.preview_original_label.setStyleSheet(f"color: {self.TEXT_SECONDARY};")
+        preview_info.addWidget(self.preview_original_label)
         
-        preview_result.addWidget(QLabel("→", styleSheet="color: #6c5ce7; font-weight: bold;"))
+        preview_info.addWidget(QLabel("→", styleSheet=f"color: {self.ACCENT};"))
         
         self.preview_compressed_label = QLabel("压缩后: -")
-        self.preview_compressed_label.setStyleSheet("color: #a29bfe; font-weight: 600;")
-        preview_result.addWidget(self.preview_compressed_label)
+        self.preview_compressed_label.setStyleSheet(f"color: {self.TEXT_ACTIVE};")
+        preview_info.addWidget(self.preview_compressed_label)
         
-        preview_result.addSpacing(20)
+        preview_info.addSpacing(20)
         
         self.preview_savings_label = QLabel("节省: -")
-        self.preview_savings_label.setStyleSheet("color: #00d9a5; font-weight: 600;")
-        preview_result.addWidget(self.preview_savings_label)
-        preview_result.addStretch()
+        self.preview_savings_label.setStyleSheet("color: #4ec9b0;")
+        preview_info.addWidget(self.preview_savings_label)
+        preview_info.addStretch()
         
-        preview_layout.addLayout(preview_result)
-        center_layout.addWidget(preview_card)
+        preview_layout.addLayout(preview_info)
+        center_layout.addWidget(preview_group)
         
-        content.addWidget(center_panel, 2)
-        
-        # 右侧面板 - 操作和日志
-        right_panel = QWidget()
-        right_layout = QVBoxLayout(right_panel)
-        right_layout.setSpacing(16)
-        right_layout.setContentsMargins(0, 0, 0, 0)
-        
-        # 操作按钮卡片
-        action_card = QGroupBox("🚀 操作")
-        action_layout = QVBoxLayout(action_card)
+        # 操作组
+        action_group = self._create_vscode_group("操作")
+        action_layout = QVBoxLayout(action_group)
         action_layout.setSpacing(10)
         
-        # 选项行 - 水平排列
+        # 选项
         options_row = QHBoxLayout()
         self.subfolder_cb = QCheckBox("包含子文件夹")
         self.subfolder_cb.setChecked(True)
@@ -736,10 +741,10 @@ class MainWindow(QWidget):
         
         self.stats_label = QLabel("准备就绪")
         self.stats_label.setAlignment(Qt.AlignCenter)
-        self.stats_label.setStyleSheet("color: #6b6b7b; padding: 4px;")
+        self.stats_label.setStyleSheet(f"color: {self.TEXT_SECONDARY}; font-size: 12px;")
         action_layout.addWidget(self.stats_label)
         
-        # 按钮行
+        # 按钮
         btn_row = QHBoxLayout()
         btn_row.setSpacing(8)
         
@@ -763,13 +768,19 @@ class MainWindow(QWidget):
         self.export_btn.clicked.connect(self._export_stats)
         action_layout.addWidget(self.export_btn)
         
-        right_layout.addWidget(action_card)
+        center_layout.addWidget(action_group)
+        center_layout.addStretch()
         
-        content.addWidget(right_panel, 1)
+        main_layout.addWidget(center_panel, 1)
         
-        main_layout.addLayout(content, 1)
+        # ========== 底部面板（日志区）==========
+        bottom_panel = QWidget()
+        bottom_panel.setFixedHeight(200)
+        bottom_panel.setStyleSheet(f"background-color: {self.BG_PRIMARY}; border-top: 1px solid {self.BORDER};")
+        bottom_layout = QVBoxLayout(bottom_panel)
+        bottom_layout.setContentsMargins(0, 0, 0, 0)
+        bottom_layout.setSpacing(0)
         
-        # ========== 底部日志区 ==========
         self.tab_widget = QTabWidget()
         self.tab_widget.setDocumentMode(True)
         
@@ -777,7 +788,7 @@ class MainWindow(QWidget):
         self.log_text = QTextEdit()
         self.log_text.setReadOnly(True)
         self.log_text.setPlaceholderText("等待开始...")
-        self.tab_widget.addTab(self.log_text, "📝 处理日志")
+        self.tab_widget.addTab(self.log_text, "输出")
         
         # 详细统计标签页
         self.stats_table = QTableWidget()
@@ -787,15 +798,28 @@ class MainWindow(QWidget):
         ])
         self.stats_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.stats_table.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self.stats_table.setAlternatingRowColors(True)
-        self.tab_widget.addTab(self.stats_table, "📊 详细统计")
+        self.stats_table.setAlternatingRowColors(False)
+        self.tab_widget.addTab(self.stats_table, "统计")
         
-        main_layout.addWidget(self.tab_widget, 1)
+        bottom_layout.addWidget(self.tab_widget)
+        
+        # 将底部面板添加到主布局
+        main_container = QWidget()
+        main_container_layout = QVBoxLayout(main_container)
+        main_container_layout.setContentsMargins(0, 0, 0, 0)
+        main_container_layout.setSpacing(0)
+        main_container_layout.addWidget(center_panel, 1)
+        main_container_layout.addWidget(bottom_panel)
+        
+        main_layout.addWidget(main_container, 1)
+    
+    def _create_vscode_group(self, title):
+        """创建 VS Code 风格的分组"""
+        group = QGroupBox(title)
+        return group
     
     def _connect_signals(self):
         """连接信号与槽"""
-        self.start_btn.clicked.connect(self._start_compression)
-        self.cancel_btn.clicked.connect(self._cancel_compression)
         self.quality_slider.valueChanged.connect(self.quality_spin.setValue)
         self.quality_spin.valueChanged.connect(self.quality_slider.setValue)
     
@@ -812,17 +836,6 @@ class MainWindow(QWidget):
         self.target_size_spin.setEnabled(enabled)
         self.quality_slider.setEnabled(not enabled)
         self.quality_spin.setEnabled(not enabled)
-    
-    def _on_rename_toggled(self, state):
-        """重命名开关切换"""
-        enabled = state == Qt.Checked
-        self.rename_combo.setEnabled(enabled)
-        self._on_rename_pattern_changed()
-    
-    def _on_rename_pattern_changed(self):
-        """重命名模式改变"""
-        if not hasattr(self, 'rename_cb') or not self.rename_cb.isChecked():
-            return
     
     def _load_history(self):
         """加载历史记录"""
@@ -881,7 +894,6 @@ class MainWindow(QWidget):
         
         settings = preset.get("settings", {})
         
-        # 应用预设设置
         self.quality_spin.setValue(settings.get("quality", DEFAULT_QUALITY))
         self.quality_slider.setValue(settings.get("quality", DEFAULT_QUALITY))
         
@@ -898,7 +910,6 @@ class MainWindow(QWidget):
         
         self.min_size_spin.setValue(settings.get("min_size_mb", DEFAULT_MIN_SIZE_MB))
         
-        # 显示描述
         desc = preset.get("description", "")
         self.preset_desc_label.setText(f"({desc})")
         
@@ -912,419 +923,248 @@ class MainWindow(QWidget):
         if not ok or not name:
             return
         
-        # 检查是否已存在
-        presets = config_manager.load_presets()
-        default_names = {"网页用", "手机分享", "高质量存档", "缩略图"}
-        
-        if name in default_names:
-            QMessageBox.warning(self, "保存失败", "不能使用内置预设名称")
-            return
-        
-        desc, ok = QInputDialog.getText(self, "保存预设", "描述:", QLineEdit.Normal, "")
-        
         settings = {
             "quality": self.quality_spin.value(),
-            "output_format": self._get_output_format(),
+            "output_format": ["original", "jpg", "png", "webp"][self.format_combo.currentIndex()],
             "max_width": self.max_width_spin.value() if self.resize_cb.isChecked() else 0,
             "max_height": self.max_height_spin.value() if self.resize_cb.isChecked() else 0,
             "keep_ratio": self.keep_ratio_cb.isChecked(),
             "smart_mode": self.smart_cb.isChecked(),
             "target_size_kb": self.target_size_spin.value(),
-            "min_size_mb": self.min_size_spin.value(),
+            "min_size_mb": self.min_size_spin.value()
         }
         
-        if config_manager.save_custom_preset(name, desc, settings):
+        try:
+            config_manager.save_custom_preset(name, settings, f"质量{settings['quality']}%")
             self._load_presets()
-            # 选中新保存的预设
-            for i in range(self.preset_combo.count()):
-                if self.preset_combo.itemText(i) == name:
-                    self.preset_combo.setCurrentIndex(i)
-                    break
-            QMessageBox.information(self, "保存成功", f"预设 '{name}' 已保存")
-        else:
-            QMessageBox.warning(self, "保存失败", "保存预设时出错")
+            self.preset_combo.setCurrentText(name)
+            self.log_text.append(f"[预设] 已保存: {name}")
+        except Exception as e:
+            QMessageBox.critical(self, "错误", f"保存预设失败: {e}")
     
     def _select_input(self):
         """选择输入文件夹"""
         folder = QFileDialog.getExistingDirectory(self, "选择输入文件夹")
         if folder:
             self.input_edit.setText(folder)
-            self.log_text.append(f"[输入] {folder}")
     
     def _select_output(self):
         """选择输出文件夹"""
         folder = QFileDialog.getExistingDirectory(self, "选择输出文件夹")
         if folder:
             self.output_edit.setText(folder)
-            self.log_text.append(f"[输出] {folder}")
-    
-    def _get_output_format(self):
-        """获取输出格式"""
-        formats = ["original", "jpg", "png", "webp"]
-        return formats[self.format_combo.currentIndex()]
-    
-    def _start_compression(self):
-        """开始压缩任务"""
-        if self._is_running:
-            QMessageBox.warning(self, "提示", "压缩任务正在进行中...")
-            return
-        
-        input_dir = self.input_edit.text().strip()
-        output_dir = self.output_edit.text().strip()
-        
-        if not input_dir:
-            QMessageBox.warning(self, "输入错误", "请选择输入文件夹。")
-            return
-        
-        # 保存历史记录
-        settings = {
-            "quality": self.quality_spin.value(),
-            "format": self._get_output_format(),
-            "resize": self.resize_cb.isChecked(),
-        }
-        config_manager.add_history_item(input_dir, output_dir, settings)
-        self._load_history()
-        
-        is_overwrite_mode = False
-        if not output_dir:
-            reply = QMessageBox.question(
-                self, "确认覆盖",
-                "未选择输出文件夹，是否直接覆盖原文件？\n\n"
-                "⚠️ 警告：此操作将直接修改原始文件，无法撤销！",
-                QMessageBox.Yes | QMessageBox.No,
-                QMessageBox.No,
-            )
-            if reply == QMessageBox.No:
-                return
-            output_dir = input_dir
-            is_overwrite_mode = True
-            self.log_text.append("[模式] 覆盖原文件")
-        elif input_dir == output_dir:
-            QMessageBox.warning(self, "输入错误", "输入和输出文件夹不能相同！")
-            return
-        
-        # 清空统计表格
-        self.stats_table.setRowCount(0)
-        self.current_detailed_stats = []
-        
-        self._is_running = True
-        self.start_btn.setEnabled(False)
-        self.cancel_btn.setEnabled(True)
-        self.export_btn.setEnabled(False)
-        self.progress_bar.setValue(0)
-        self.log_text.clear()
-        self.stats_label.setText("正在初始化...")
-        self.stats_label.setStyleSheet("color: #a29bfe; padding: 8px;")
-        self.tab_widget.setCurrentIndex(0)
-        
-        # 创建工作线程
-        self.worker = CompressWorker()
-        self.worker.signals.progress.connect(self._update_progress)
-        self.worker.signals.file_completed.connect(self._on_file_completed)
-        self.worker.signals.result.connect(self._show_result)
-        self.worker.signals.finished.connect(self._on_finished)
-        
-        self.thread = QThread()
-        self.worker.moveToThread(self.thread)
-        
-        # 获取参数
-        max_width = self.max_width_spin.value() if self.resize_cb.isChecked() else 0
-        max_height = self.max_height_spin.value() if self.resize_cb.isChecked() else 0
-        keep_ratio = self.keep_ratio_cb.isChecked()
-        output_format = self._get_output_format()
-        smart_mode = self.smart_cb.isChecked()
-        target_size_kb = self.target_size_spin.value() if smart_mode else 0
-        keep_exif = self.keep_exif_cb.isChecked()
-        auto_rotate = self.auto_rotate_cb.isChecked()
-        
-        self.thread.started.connect(
-            lambda: self.worker.run(
-                input_dir, output_dir,
-                self.quality_spin.value(),
-                self.subfolder_cb.isChecked(),
-                self.min_size_spin.value(),
-                is_overwrite_mode,
-                max_width, max_height, keep_ratio,
-                output_format,
-                smart_mode, target_size_kb,
-                None,  # rename_pattern
-                keep_exif, auto_rotate,
-            )
-        )
-        
-        self.thread.start()
-    
-    def _cancel_compression(self):
-        """取消压缩任务"""
-        if self.worker and self._is_running:
-            self.worker.cancel()
-            self.stats_label.setText("正在取消...")
-            self.stats_label.setStyleSheet("color: #ff6b6b; padding: 8px;")
-            self.cancel_btn.setEnabled(False)
-    
-    def _update_progress(self, value, message):
-        """更新进度"""
-        self.progress_bar.setValue(value)
-        self.log_text.append(message)
-        self.stats_label.setText(f"处理中... {value}%")
-    
-    def _on_file_completed(self, stat_record):
-        """单个文件完成"""
-        self.current_detailed_stats.append(stat_record)
-        
-        # 添加到表格
-        row = self.stats_table.rowCount()
-        self.stats_table.insertRow(row)
-        
-        self.stats_table.setItem(row, 0, QTableWidgetItem(str(stat_record["index"])))
-        self.stats_table.setItem(row, 1, QTableWidgetItem(stat_record["filename"]))
-        
-        status_item = QTableWidgetItem(stat_record["status"])
-        if stat_record["status"] == "processed":
-            status_item.setForeground(QColor("#00d9a5"))
-        elif stat_record["status"] == "failed":
-            status_item.setForeground(QColor("#ff6b6b"))
-        elif stat_record["status"] == "skipped":
-            status_item.setForeground(QColor("#ffd166"))
-        self.stats_table.setItem(row, 2, status_item)
-        
-        self.stats_table.setItem(row, 3, QTableWidgetItem(format_bytes(stat_record["original_size"])))
-        self.stats_table.setItem(row, 4, QTableWidgetItem(format_bytes(stat_record["compressed_size"])))
-        
-        savings = stat_record["original_size"] - stat_record["compressed_size"]
-        savings_pct = stat_record.get("savings_percent", 0)
-        self.stats_table.setItem(row, 5, QTableWidgetItem(f"{format_bytes(savings)} ({savings_pct:.1f}%)"))
-        
-        dim_before = stat_record.get("dimensions_before", "")
-        dim_after = stat_record.get("dimensions_after", "")
-        dim_text = f"{dim_before} → {dim_after}" if dim_before else "-"
-        self.stats_table.setItem(row, 6, QTableWidgetItem(dim_text))
-    
-    def _show_result(self, result):
-        """显示结果"""
-        if "canceled" in result:
-            self.stats_label.setText("⚠️ 任务已被用户取消")
-            self.stats_label.setStyleSheet("color: #ff6b6b; padding: 8px;")
-            return
-        
-        if "error" in result:
-            self.stats_label.setText(f"❌ 错误: {result['error']}")
-            self.stats_label.setStyleSheet("color: #ff6b6b; padding: 8px;")
-            return
-        
-        p, s, t, f, c = result["processed"], result["skipped"], result["too_small"], result["failed"], result["cached"]
-        orig = format_bytes(result["total_orig"])
-        comp = format_bytes(result["total_comp"])
-        saved = format_bytes(result["saved"])
-        threads = result.get("thread_count", 0)
-        
-        msg = f"✅ 完成！处理:{p} 跳过:{s} 太小:{t} 失败:{f} 缓存:{c} | 原始:{orig} → 压缩后:{comp} | 节省:{saved}"
-        self.stats_label.setText(msg)
-        self.stats_label.setStyleSheet("color: #00d9a5; padding: 8px;")
-        self.export_btn.setEnabled(True)
-        self.tab_widget.setCurrentIndex(1)
-    
-    def _export_stats(self):
-        """导出统计到 CSV"""
-        if not self.current_detailed_stats:
-            QMessageBox.information(self, "提示", "没有可导出的统计数据")
-            return
-        
-        import csv
-        
-        file_path, _ = QFileDialog.getSaveFileName(
-            self, "导出统计", f"compress_stats_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-            "CSV Files (*.csv)"
-        )
-        
-        if not file_path:
-            return
-        
-        try:
-            with open(file_path, 'w', newline='', encoding='utf-8-sig') as f:
-                writer = csv.writer(f)
-                writer.writerow([
-                    "序号", "文件名", "状态", "原始大小(B)", "压缩后大小(B)",
-                    "节省(B)", "节省(%)", "原尺寸", "新尺寸"
-                ])
-                
-                for stat in self.current_detailed_stats:
-                    writer.writerow([
-                        stat.get("index", 0),
-                        stat.get("filename", ""),
-                        stat.get("status", ""),
-                        stat.get("original_size", 0),
-                        stat.get("compressed_size", 0),
-                        stat.get("original_size", 0) - stat.get("compressed_size", 0),
-                        f"{stat.get('savings_percent', 0):.2f}",
-                        stat.get("dimensions_before", ""),
-                        stat.get("dimensions_after", ""),
-                    ])
-            
-            QMessageBox.information(self, "导出成功", f"统计已导出到:\n{file_path}")
-        except Exception as e:
-            QMessageBox.warning(self, "导出失败", f"导出失败:\n{str(e)}")
-    
-    def _on_finished(self):
-        """任务完成后的清理工作"""
-        if self.thread:
-            self.thread.quit()
-            self.thread.wait()
-            self.thread.deleteLater()
-        
-        if self.worker:
-            self.worker.deleteLater()
-        
-        self.thread = None
-        self.worker = None
-        self._is_running = False
-        self.start_btn.setEnabled(True)
-        self.cancel_btn.setEnabled(False)
-        
-        if "准备就绪" not in self.stats_label.text():
-            self.log_text.append("-" * 40)
-            self.log_text.append("任务结束")
-    
-    def _preview_compression(self):
-        """预览第一张图片的压缩效果"""
-        input_dir = self.input_edit.text().strip()
-        
-        if not input_dir:
-            QMessageBox.warning(self, "提示", "请先选择输入文件夹")
-            return
-        
-        input_path = Path(input_dir)
-        if not input_path.exists():
-            QMessageBox.warning(self, "错误", "输入文件夹不存在")
-            return
-        
-        # 查找第一张图片
-        from src.config import IMAGE_EXTENSIONS
-        image_files = [
-            p for p in input_path.iterdir()
-            if p.is_file() and p.suffix.lower() in IMAGE_EXTENSIONS
-        ]
-        
-        if not image_files:
-            QMessageBox.information(self, "提示", "输入文件夹中没有图片")
-            return
-        
-        first_image = image_files[0]
-        
-        # 执行压缩预览
-        try:
-            import tempfile
-            
-            with tempfile.NamedTemporaryFile(suffix=first_image.suffix, delete=False) as tmp:
-                tmp_path = Path(tmp.name)
-            
-            # 压缩参数
-            quality = self.quality_spin.value()
-            max_width = self.max_width_spin.value() if self.resize_cb.isChecked() else 0
-            max_height = self.max_height_spin.value() if self.resize_cb.isChecked() else 0
-            keep_ratio = self.keep_ratio_cb.isChecked()
-            output_format = self._get_output_format()
-            keep_exif = self.keep_exif_cb.isChecked()
-            auto_rotate = self.auto_rotate_cb.isChecked()
-            
-            # 执行压缩
-            _, status, orig_size, new_size, details = compress_image(
-                src_path=first_image,
-                input_root=input_path,
-                output_root=tmp_path.parent,
-                quality=quality,
-                min_size_bytes=0,
-                overwrite=False,
-                max_width=max_width,
-                max_height=max_height,
-                keep_ratio=keep_ratio,
-                output_format=output_format,
-                smart_mode=self.smart_cb.isChecked(),
-                target_size_kb=self.target_size_spin.value() if self.smart_cb.isChecked() else 0,
-                keep_exif=keep_exif,
-                auto_rotate=auto_rotate,
-            )
-            
-            # 清理临时文件
-            if tmp_path.exists():
-                tmp_path.unlink()
-            
-            # 显示预览结果
-            if status == "processed":
-                self.preview_original_label.setText(f"原图: {format_bytes(orig_size)}")
-                self.preview_compressed_label.setText(f"压缩后: {format_bytes(new_size)}")
-                
-                savings = orig_size - new_size
-                savings_pct = (savings / orig_size * 100) if orig_size > 0 else 0
-                self.preview_savings_label.setText(f"节省: {format_bytes(savings)} ({savings_pct:.1f}%)")
-                
-                # 显示详细信息
-                dim_info = ""
-                if details.get("resized"):
-                    dim_info = f" 尺寸: {details.get('dimensions_before')} → {details.get('dimensions_after')}"
-                
-                QMessageBox.information(
-                    self, "预览结果",
-                    f"文件: {first_image.name}\n"
-                    f"原大小: {format_bytes(orig_size)}\n"
-                    f"压缩后: {format_bytes(new_size)}\n"
-                    f"节省: {format_bytes(savings)} ({savings_pct:.1f}%)\n"
-                    f"状态: {status}{dim_info}"
-                )
-            else:
-                QMessageBox.information(self, "预览结果", f"无法预览: {status}")
-                
-        except Exception as e:
-            QMessageBox.warning(self, "预览失败", f"预览时出错: {str(e)}")
-    
-    def _show_exif(self):
-        """显示第一张图片的EXIF信息"""
-        input_dir = self.input_edit.text().strip()
-        
-        if not input_dir:
-            QMessageBox.warning(self, "提示", "请先选择输入文件夹")
-            return
-        
-        input_path = Path(input_dir)
-        if not input_path.exists():
-            QMessageBox.warning(self, "错误", "输入文件夹不存在")
-            return
-        
-        # 查找第一张图片
-        from src.config import IMAGE_EXTENSIONS
-        image_files = [
-            p for p in input_path.iterdir()
-            if p.is_file() and p.suffix.lower() in IMAGE_EXTENSIONS
-        ]
-        
-        if not image_files:
-            QMessageBox.information(self, "提示", "输入文件夹中没有图片")
-            return
-        
-        first_image = image_files[0]
-        
-        # 显示EXIF对话框
-        dialog = ExifDialog(first_image, self)
-        dialog.exec_()
     
     def _show_about(self):
         """显示关于对话框"""
         dialog = AboutDialog(self)
         dialog.exec_()
     
-    def closeEvent(self, event):
-        """处理窗口关闭事件"""
-        if self._is_running:
-            reply = QMessageBox.question(
-                self, "确认退出",
-                "压缩任务正在进行中，确定要退出吗？",
-                QMessageBox.Yes | QMessageBox.No,
-                QMessageBox.No,
+    def _show_exif(self):
+        """显示 EXIF 对话框"""
+        input_path = self.input_edit.text()
+        if not input_path or not Path(input_path).exists():
+            QMessageBox.warning(self, "警告", "请先选择有效的输入文件夹")
+            return
+        
+        files = list(Path(input_path).glob("*"))
+        image_files = [f for f in files if f.suffix.lower() in ['.jpg', '.jpeg', '.png', '.webp', '.bmp', '.tiff']]
+        
+        if not image_files:
+            QMessageBox.warning(self, "警告", "未找到图片文件")
+            return
+        
+        exif_data, image_info = get_exif_info(image_files[0])
+        dialog = ExifDialog(exif_data, image_info, self)
+        dialog.exec_()
+    
+    def _preview_compression(self):
+        """预览压缩效果"""
+        input_path = self.input_edit.text()
+        if not input_path or not Path(input_path).exists():
+            QMessageBox.warning(self, "警告", "请先选择有效的输入文件夹")
+            return
+        
+        files = list(Path(input_path).glob("*"))
+        image_files = [f for f in files if f.suffix.lower() in ['.jpg', '.jpeg', '.png', '.webp', '.bmp', '.tiff']]
+        
+        if not image_files:
+            QMessageBox.warning(self, "警告", "未找到图片文件")
+            return
+        
+        self.log_text.append("[预览] 正在处理第一张图片...")
+        
+        try:
+            result = compress_image(
+                src_path=image_files[0],
+                input_root=Path(input_path),
+                output_root=Path(input_path),
+                quality=self.quality_spin.value(),
+                min_size_bytes=self.min_size_spin.value() * 1024 * 1024,
+                overwrite=False,
+                max_width=self.max_width_spin.value() if self.resize_cb.isChecked() else 0,
+                max_height=self.max_height_spin.value() if self.resize_cb.isChecked() else 0,
+                keep_ratio=self.keep_ratio_cb.isChecked(),
+                output_format=["original", "jpg", "png", "webp"][self.format_combo.currentIndex()],
+                smart_mode=self.smart_cb.isChecked(),
+                target_size_kb=self.target_size_spin.value(),
+                keep_exif=self.keep_exif_cb.isChecked(),
+                auto_rotate=self.auto_rotate_cb.isChecked()
             )
-            if reply == QMessageBox.Yes:
-                self._cancel_compression()
-                event.accept()
-            else:
-                event.ignore()
-        else:
-            event.accept()
+            
+            path, status, orig_size, new_size, details = result
+            
+            self.preview_original_label.setText(f"原图: {format_bytes(orig_size)}")
+            self.preview_compressed_label.setText(f"压缩后: {format_bytes(new_size)}")
+            
+            savings_percent = ((orig_size - new_size) / orig_size * 100) if orig_size > 0 else 0
+            self.preview_savings_label.setText(f"节省: {savings_percent:.1f}%")
+            
+            self.log_text.append(f"[预览] 完成: {path.name} - {status}")
+            
+        except Exception as e:
+            QMessageBox.critical(self, "错误", f"预览失败: {e}")
+    
+    def _start_compression(self):
+        """开始压缩"""
+        input_path = self.input_edit.text()
+        if not input_path:
+            QMessageBox.warning(self, "警告", "请选择输入文件夹")
+            return
+        
+        if not Path(input_path).exists():
+            QMessageBox.warning(self, "警告", "输入文件夹不存在")
+            return
+        
+        self._is_running = True
+        self.start_btn.setEnabled(False)
+        self.cancel_btn.setEnabled(True)
+        self.export_btn.setEnabled(False)
+        
+        self.progress_bar.setValue(0)
+        self.stats_label.setText("准备中...")
+        self.log_text.clear()
+        self.log_text.append("[开始] 图片压缩任务")
+        
+        self.thread = QThread()
+        self.worker = CompressWorker(
+            input_path=input_path,
+            output_path=self.output_edit.text() or None,
+            quality=self.quality_spin.value(),
+            min_size_bytes=self.min_size_spin.value() * 1024 * 1024,
+            max_width=self.max_width_spin.value() if self.resize_cb.isChecked() else 0,
+            max_height=self.max_height_spin.value() if self.resize_cb.isChecked() else 0,
+            keep_ratio=self.keep_ratio_cb.isChecked(),
+            output_format=["original", "jpg", "png", "webp"][self.format_combo.currentIndex()],
+            smart_mode=self.smart_cb.isChecked(),
+            target_size_kb=self.target_size_spin.value(),
+            include_subfolders=self.subfolder_cb.isChecked(),
+            incremental=self.incremental_cb.isChecked()
+        )
+        
+        self.worker.moveToThread(self.thread)
+        
+        self.worker.progress.connect(self._on_progress)
+        self.worker.file_completed.connect(self._on_file_completed)
+        self.worker.result.connect(self._on_result)
+        self.worker.finished.connect(self._on_finished)
+        
+        self.thread.started.connect(self.worker.run)
+        self.thread.start()
+    
+    def _cancel_compression(self):
+        """取消压缩"""
+        if self.worker:
+            self.worker.cancel()
+            self.log_text.append("[取消] 正在停止...")
+    
+    def _on_progress(self, current, total):
+        """进度更新"""
+        percent = int(current / total * 100) if total > 0 else 0
+        self.progress_bar.setValue(percent)
+        self.stats_label.setText(f"处理中... {current}/{total}")
+    
+    def _on_file_completed(self, filename, status):
+        """文件完成"""
+        self.log_text.append(f"[处理] {filename} - {status}")
+    
+    def _on_result(self, results):
+        """处理结果"""
+        self.current_detailed_stats = results
+        self._update_stats_table(results)
+    
+    def _update_stats_table(self, results):
+        """更新统计表格"""
+        self.stats_table.setRowCount(len(results))
+        
+        for i, (path, status, orig_size, new_size, details) in enumerate(results):
+            self.stats_table.setItem(i, 0, QTableWidgetItem(str(i + 1)))
+            self.stats_table.setItem(i, 1, QTableWidgetItem(path.name))
+            self.stats_table.setItem(i, 2, QTableWidgetItem(status))
+            self.stats_table.setItem(i, 3, QTableWidgetItem(format_bytes(orig_size)))
+            self.stats_table.setItem(i, 4, QTableWidgetItem(format_bytes(new_size)))
+            
+            savings = orig_size - new_size
+            savings_percent = (savings / orig_size * 100) if orig_size > 0 else 0
+            self.stats_table.setItem(i, 5, QTableWidgetItem(f"{format_bytes(savings)} ({savings_percent:.1f}%)"))
+            
+            dim_change = details.get('dimensions', '-')
+            self.stats_table.setItem(i, 6, QTableWidgetItem(dim_change))
+    
+    def _on_finished(self, success_count, skip_count, error_count, total_saved):
+        """任务完成"""
+        self._is_running = False
+        self.start_btn.setEnabled(True)
+        self.cancel_btn.setEnabled(False)
+        self.export_btn.setEnabled(True)
+        
+        self.progress_bar.setValue(100)
+        self.stats_label.setText(f"完成: 成功 {success_count} | 跳过 {skip_count} | 失败 {error_count}")
+        
+        self.log_text.append(f"[完成] 任务结束")
+        self.log_text.append(f"[统计] 成功: {success_count}, 跳过: {skip_count}, 失败: {error_count}")
+        self.log_text.append(f"[节省] 共节省: {format_bytes(total_saved)}")
+        
+        if self.input_edit.text():
+            config_manager.save_history(self.input_edit.text(), self.output_edit.text())
+            self._load_history()
+        
+        self.thread.quit()
+        self.thread.wait()
+        self.worker.deleteLater()
+        self.thread.deleteLater()
+        self.worker = None
+        self.thread = None
+    
+    def _export_stats(self):
+        """导出统计"""
+        if not self.current_detailed_stats:
+            QMessageBox.warning(self, "警告", "没有可导出的统计数据")
+            return
+        
+        path, _ = QFileDialog.getSaveFileName(
+            self, "导出统计", f"压缩统计_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+            "CSV files (*.csv);;All files (*.*)"
+        )
+        
+        if not path:
+            return
+        
+        try:
+            import csv
+            with open(path, 'w', newline='', encoding='utf-8') as f:
+                writer = csv.writer(f)
+                writer.writerow(["序号", "文件名", "状态", "原始大小", "压缩后", "节省", "尺寸变化"])
+                
+                for i, (p, status, orig, new, details) in enumerate(self.current_detailed_stats, 1):
+                    savings = orig - new
+                    savings_pct = (savings / orig * 100) if orig > 0 else 0
+                    writer.writerow([
+                        i, p.name, status, format_bytes(orig), format_bytes(new),
+                        f"{format_bytes(savings)} ({savings_pct:.1f}%)",
+                        details.get('dimensions', '-')
+                    ])
+            
+            self.log_text.append(f"[导出] 统计已保存: {path}")
+            QMessageBox.information(self, "成功", "统计已导出")
+        except Exception as e:
+            QMessageBox.critical(self, "错误", f"导出失败: {e}")
