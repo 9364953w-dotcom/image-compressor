@@ -136,7 +136,9 @@ class MainWindow(QWidget):
             QCheckBox {
                 color: #e8e8ed;
                 font-size: 13px;
-                spacing: 6px;
+                spacing: 8px;
+                background: transparent;
+                border: none;
             }
             
             QCheckBox::indicator {
@@ -154,6 +156,10 @@ class MainWindow(QWidget):
             
             QCheckBox::indicator:hover {
                 border-color: #a29bfe;
+            }
+            
+            QCheckBox::indicator:unchecked:hover {
+                background-color: rgba(108, 92, 231, 0.1);
             }
             
             /* 下拉框 - 无圆角 */
@@ -181,24 +187,28 @@ class MainWindow(QWidget):
                 selection-background-color: #6c5ce7;
             }
             
-            /* 滑块 - 简洁样式 */
+            /* 滑块 - 优化样式 */
             QSlider::groove:horizontal {
-                height: 4px;
-                background-color: #333;
-                border-radius: 0px;
+                height: 6px;
+                background-color: #252530;
+                border: 1px solid #444;
             }
             
             QSlider::sub-page:horizontal {
                 background-color: #6c5ce7;
-                border-radius: 0px;
             }
             
             QSlider::handle:horizontal {
-                width: 14px;
-                height: 14px;
-                margin: -5px 0;
+                width: 16px;
+                height: 16px;
+                margin: -6px 0;
                 background-color: #fff;
-                border-radius: 0px;
+                border: 1px solid #888;
+            }
+            
+            QSlider::handle:horizontal:hover {
+                background-color: #a29bfe;
+                border-color: #6c5ce7;
             }
             
             /* 数值框 - 带箭头按钮 */
@@ -206,15 +216,14 @@ class MainWindow(QWidget):
                 background-color: #252530;
                 border: 1px solid #444;
                 border-radius: 0px;
-                padding: 4px 6px;
-                padding-right: 20px;
                 color: #ffffff;
             }
             
             QSpinBox::up-button, QDoubleSpinBox::up-button {
                 subcontrol-origin: border;
                 subcontrol-position: top right;
-                width: 18px;
+                width: 16px;
+                height: 50%;
                 border-left: 1px solid #444;
                 border-bottom: 1px solid #444;
                 background-color: #2a2a35;
@@ -223,26 +232,54 @@ class MainWindow(QWidget):
             QSpinBox::down-button, QDoubleSpinBox::down-button {
                 subcontrol-origin: border;
                 subcontrol-position: bottom right;
-                width: 18px;
+                width: 16px;
+                height: 50%;
                 border-left: 1px solid #444;
                 background-color: #2a2a35;
             }
             
-            QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover,
+            QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover {
+                background-color: #6c5ce7;
+            }
+            
             QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover {
-                background-color: #353540;
+                background-color: #6c5ce7;
             }
             
-            QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {
-                image: url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iOCIgaGVpZ2h0PSI1IiB2aWV3Qm94PSIwIDAgOCA1IiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxwYXRoIGQ9Ik0xIDRMNCAxTDcgNCIgc3Ryb2tlPSIjODg4IiBzdHJva2Utd2lkdGg9IjEuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PC9zdmc+);
-                width: 8px;
-                height: 5px;
+            QSpinBox::up-arrow {
+                image: none;
+                border-left: 4px solid transparent;
+                border-right: 4px solid transparent;
+                border-bottom: 5px solid #888;
+                width: 0px;
+                height: 0px;
             }
             
-            QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {
-                image: url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iOCIgaGVpZ2h0PSI1IiB2aWV3Qm94PSIwIDAgOCA1IiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxwYXRoIGQ9Ik0xIDFMNCA0TDcgMSIgc3Ryb2tlPSIjODg4IiBzdHJva2Utd2lkdGg9IjEuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PC9zdmc+);
-                width: 8px;
-                height: 5px;
+            QSpinBox::down-arrow {
+                image: none;
+                border-left: 4px solid transparent;
+                border-right: 4px solid transparent;
+                border-top: 5px solid #888;
+                width: 0px;
+                height: 0px;
+            }
+            
+            QDoubleSpinBox::up-arrow {
+                image: none;
+                border-left: 4px solid transparent;
+                border-right: 4px solid transparent;
+                border-bottom: 5px solid #888;
+                width: 0px;
+                height: 0px;
+            }
+            
+            QDoubleSpinBox::down-arrow {
+                image: none;
+                border-left: 4px solid transparent;
+                border-right: 4px solid transparent;
+                border-top: 5px solid #888;
+                width: 0px;
+                height: 0px;
             }
             
             /* 进度条 */
@@ -506,7 +543,7 @@ class MainWindow(QWidget):
         center_layout.setContentsMargins(0, 0, 0, 0)
         
         # 压缩选项卡片
-        options_card = QGroupBox("⚙️ 压缩选项")
+        options_card = QGroupBox("📤 输出设置")
         options_layout = QVBoxLayout(options_card)
         options_layout.setSpacing(16)
         
@@ -526,7 +563,7 @@ class MainWindow(QWidget):
         self.min_size_spin.setDecimals(1)
         self.min_size_spin.setValue(DEFAULT_MIN_SIZE_MB)
         self.min_size_spin.setSuffix(" MB")
-        self.min_size_spin.setFixedWidth(100)
+        self.min_size_spin.setFixedWidth(110)
         row1.addWidget(self.min_size_spin)
         row1.addStretch()
         
@@ -545,7 +582,7 @@ class MainWindow(QWidget):
         self.quality_spin.setRange(1, 100)
         self.quality_spin.setValue(DEFAULT_QUALITY)
         self.quality_spin.setSuffix("%")
-        self.quality_spin.setFixedWidth(70)
+        self.quality_spin.setFixedWidth(80)
         quality_row.addWidget(self.quality_spin)
         
         options_layout.addLayout(quality_row)
@@ -601,7 +638,7 @@ class MainWindow(QWidget):
         self.target_size_spin.setRange(10, 10000)
         self.target_size_spin.setValue(200)
         self.target_size_spin.setSuffix(" KB")
-        self.target_size_spin.setFixedWidth(80)
+        self.target_size_spin.setFixedWidth(90)
         self.target_size_spin.setEnabled(False)
         smart_layout.addWidget(self.target_size_spin)
         smart_layout.addStretch()
@@ -677,17 +714,19 @@ class MainWindow(QWidget):
         # 操作按钮卡片
         action_card = QGroupBox("🚀 操作")
         action_layout = QVBoxLayout(action_card)
+        action_layout.setSpacing(10)
         
-        # 复选框
+        # 选项行 - 水平排列
+        options_row = QHBoxLayout()
         self.subfolder_cb = QCheckBox("包含子文件夹")
         self.subfolder_cb.setChecked(True)
-        action_layout.addWidget(self.subfolder_cb)
+        options_row.addWidget(self.subfolder_cb)
         
         self.incremental_cb = QCheckBox("跳过已处理文件")
         self.incremental_cb.setChecked(True)
-        action_layout.addWidget(self.incremental_cb)
-        
-        action_layout.addSpacing(10)
+        options_row.addWidget(self.incremental_cb)
+        options_row.addStretch()
+        action_layout.addLayout(options_row)
         
         # 进度条
         self.progress_bar = QProgressBar()
@@ -697,10 +736,8 @@ class MainWindow(QWidget):
         
         self.stats_label = QLabel("准备就绪")
         self.stats_label.setAlignment(Qt.AlignCenter)
-        self.stats_label.setStyleSheet("color: #6b6b7b; padding: 8px;")
+        self.stats_label.setStyleSheet("color: #6b6b7b; padding: 4px;")
         action_layout.addWidget(self.stats_label)
-        
-        action_layout.addSpacing(10)
         
         # 按钮行
         btn_row = QHBoxLayout()
