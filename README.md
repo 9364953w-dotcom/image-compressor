@@ -6,6 +6,16 @@
 ![PyQt5](https://img.shields.io/badge/PyQt5-5.15+-green.svg)
 ![License](https://img.shields.io/badge/License-MIT-yellow.svg)
 
+## ⬇️ 快速下载
+
+- [前往 Releases 下载最新版本](https://github.com/9364953w-dotcom/image-compressor/releases/latest)
+- [macOS 版（ZIP）](https://github.com/9364953w-dotcom/image-compressor/releases/latest/download/ImageCompressor-macOS.zip)
+- [Windows 版（ZIP）](https://github.com/9364953w-dotcom/image-compressor/releases/latest/download/ImageCompressor-Windows.zip)
+
+## 🖼️ 程序界面截图
+
+![图片批量压缩工具主界面](docs/images/ui-main.png)
+
 ## ✨ 功能特性
 
 ### 基础功能
