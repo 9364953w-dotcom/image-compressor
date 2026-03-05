@@ -53,21 +53,20 @@ class MainWindow(QWidget):
         self._load_presets()
     
     def _setup_modern_style(self):
-        """设置现代深色玻璃拟态风格"""
+        """设置现代深色玻璃拟态风格 - 直角版本"""
         self.setStyleSheet("""
             /* 全局样式 - 深黑背景 */
             QWidget {
                 background-color: #0d0d12;
                 color: #e8e8ed;
-                font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
                 font-size: 13px;
             }
             
-            /* 玻璃拟态卡片 */
+            /* 玻璃拟态卡片 - 无圆角 */
             QGroupBox {
-                background-color: rgba(35, 35, 45, 0.6);
-                border: 1px solid rgba(255, 255, 255, 0.1);
-                border-radius: 12px;
+                background-color: #1a1a24;
+                border: 1px solid #333;
+                border-radius: 0px;
                 margin-top: 8px;
                 padding: 12px;
             }
@@ -80,32 +79,31 @@ class MainWindow(QWidget):
                 font-size: 12px;
             }
             
-            /* 输入框 */
+            /* 输入框 - 无圆角 */
             QLineEdit {
-                background-color: #1a1a24;
-                border: 1px solid rgba(255, 255, 255, 0.1);
-                border-radius: 8px;
-                padding: 8px 12px;
+                background-color: #252530;
+                border: 1px solid #444;
+                border-radius: 0px;
+                padding: 8px 10px;
                 color: #ffffff;
                 font-size: 13px;
             }
             
             QLineEdit:focus {
                 border-color: #6c5ce7;
-                background-color: #20202c;
             }
             
             QLineEdit::placeholder {
                 color: #666;
             }
             
-            /* 主按钮 */
+            /* 主按钮 - 无圆角 */
             QPushButton {
                 background-color: #6c5ce7;
                 color: white;
                 border: none;
-                border-radius: 8px;
-                padding: 8px 16px;
+                border-radius: 0px;
+                padding: 8px 12px;
                 font-size: 13px;
             }
             
@@ -124,40 +122,46 @@ class MainWindow(QWidget):
             
             /* 次要按钮 */
             QPushButton#secondaryBtn {
-                background-color: rgba(255, 255, 255, 0.1);
-                border: 1px solid rgba(255, 255, 255, 0.15);
+                background-color: #2a2a35;
+                border: 1px solid #444;
                 color: #e8e8ed;
             }
             
             QPushButton#secondaryBtn:hover {
-                background-color: rgba(255, 255, 255, 0.15);
+                background-color: #353540;
+                border-color: #555;
             }
             
-            /* 复选框 - 简化为纯文本 */
+            /* 复选框 - 带打勾样式 */
             QCheckBox {
                 color: #e8e8ed;
                 font-size: 13px;
-                background: transparent;
+                spacing: 6px;
             }
             
             QCheckBox::indicator {
                 width: 16px;
                 height: 16px;
-                border-radius: 4px;
+                border-radius: 0px;
                 border: 2px solid #6c5ce7;
                 background-color: transparent;
             }
             
             QCheckBox::indicator:checked {
                 background-color: #6c5ce7;
+                image: url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAiIGhlaWdodD0iMTAiIHZpZXdCb3g9IjAgMCAxMCAxMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNOCAyTDQgN0wyIDUiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PC9zdmc+);
             }
             
-            /* 下拉框 */
+            QCheckBox::indicator:hover {
+                border-color: #a29bfe;
+            }
+            
+            /* 下拉框 - 无圆角 */
             QComboBox {
-                background-color: #1a1a24;
-                border: 1px solid rgba(255, 255, 255, 0.1);
-                border-radius: 8px;
-                padding: 8px 12px;
+                background-color: #252530;
+                border: 1px solid #444;
+                border-radius: 0px;
+                padding: 8px 10px;
                 color: #ffffff;
                 min-width: 100px;
             }
@@ -166,52 +170,95 @@ class MainWindow(QWidget):
                 border-color: #6c5ce7;
             }
             
-            /* 滑块 */
-            QSlider::groove:horizontal {
-                height: 6px;
+            QComboBox::drop-down {
+                border: none;
+                width: 24px;
+            }
+            
+            QComboBox QAbstractItemView {
                 background-color: #1a1a24;
-                border-radius: 3px;
+                border: 1px solid #444;
+                selection-background-color: #6c5ce7;
+            }
+            
+            /* 滑块 - 简洁样式 */
+            QSlider::groove:horizontal {
+                height: 4px;
+                background-color: #333;
+                border-radius: 0px;
             }
             
             QSlider::sub-page:horizontal {
                 background-color: #6c5ce7;
-                border-radius: 3px;
+                border-radius: 0px;
             }
             
             QSlider::handle:horizontal {
-                width: 16px;
-                height: 16px;
+                width: 14px;
+                height: 14px;
                 margin: -5px 0;
-                background-color: #ffffff;
-                border-radius: 8px;
+                background-color: #fff;
+                border-radius: 0px;
             }
             
-            QSlider::handle:horizontal:hover {
-                background-color: #a29bfe;
-            }
-            
-            /* 数值框 */
+            /* 数值框 - 带箭头按钮 */
             QSpinBox, QDoubleSpinBox {
-                background-color: #1a1a24;
-                border: 1px solid rgba(255, 255, 255, 0.1);
-                border-radius: 6px;
-                padding: 4px 8px;
+                background-color: #252530;
+                border: 1px solid #444;
+                border-radius: 0px;
+                padding: 4px 6px;
+                padding-right: 20px;
                 color: #ffffff;
+            }
+            
+            QSpinBox::up-button, QDoubleSpinBox::up-button {
+                subcontrol-origin: border;
+                subcontrol-position: top right;
+                width: 18px;
+                border-left: 1px solid #444;
+                border-bottom: 1px solid #444;
+                background-color: #2a2a35;
+            }
+            
+            QSpinBox::down-button, QDoubleSpinBox::down-button {
+                subcontrol-origin: border;
+                subcontrol-position: bottom right;
+                width: 18px;
+                border-left: 1px solid #444;
+                background-color: #2a2a35;
+            }
+            
+            QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover,
+            QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover {
+                background-color: #353540;
+            }
+            
+            QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {
+                image: url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iOCIgaGVpZ2h0PSI1IiB2aWV3Qm94PSIwIDAgOCA1IiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxwYXRoIGQ9Ik0xIDRMNCAxTDcgNCIgc3Ryb2tlPSIjODg4IiBzdHJva2Utd2lkdGg9IjEuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PC9zdmc+);
+                width: 8px;
+                height: 5px;
+            }
+            
+            QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {
+                image: url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iOCIgaGVpZ2h0PSI1IiB2aWV3Qm94PSIwIDAgOCA1IiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxwYXRoIGQ9Ik0xIDFMNCA0TDcgMSIgc3Ryb2tlPSIjODg4IiBzdHJva2Utd2lkdGg9IjEuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PC9zdmc+);
+                width: 8px;
+                height: 5px;
             }
             
             /* 进度条 */
             QProgressBar {
-                background-color: #1a1a24;
-                border-radius: 6px;
+                background-color: #252530;
+                border-radius: 0px;
                 text-align: center;
-                height: 18px;
+                height: 16px;
                 color: #e8e8ed;
                 font-size: 11px;
+                border: 1px solid #444;
             }
             
             QProgressBar::chunk {
                 background-color: #6c5ce7;
-                border-radius: 6px;
+                border-radius: 0px;
             }
             
             /* 标签页 */
@@ -222,22 +269,24 @@ class MainWindow(QWidget):
             
             QTabBar::tab {
                 background-color: #1a1a24;
+                border: 1px solid #333;
                 color: #8b8b9b;
-                padding: 10px 20px;
-                margin-right: 6px;
-                border-radius: 8px;
+                padding: 8px 16px;
+                margin-right: 4px;
+                border-radius: 0px;
             }
             
             QTabBar::tab:selected {
                 background-color: #6c5ce7;
+                border-color: #6c5ce7;
                 color: #ffffff;
             }
             
             /* 文本框 */
             QTextEdit {
                 background-color: #1a1a24;
-                border: 1px solid rgba(255, 255, 255, 0.1);
-                border-radius: 8px;
+                border: 1px solid #444;
+                border-radius: 0px;
                 padding: 10px;
                 color: #e8e8ed;
                 font-size: 12px;
@@ -246,13 +295,15 @@ class MainWindow(QWidget):
             /* 表格 */
             QTableWidget {
                 background-color: #1a1a24;
-                border: 1px solid rgba(255, 255, 255, 0.1);
-                border-radius: 8px;
+                border: 1px solid #444;
+                border-radius: 0px;
+                gridline-color: #333;
             }
             
             QTableWidget::item {
                 padding: 8px;
                 color: #e8e8ed;
+                border-bottom: 1px solid #333;
             }
             
             QTableWidget::item:selected {
@@ -261,10 +312,11 @@ class MainWindow(QWidget):
             }
             
             QHeaderView::section {
-                background-color: #232330;
+                background-color: #252530;
                 color: #a29bfe;
                 padding: 10px;
                 border: none;
+                border-right: 1px solid #333;
                 font-size: 12px;
             }
             
@@ -288,19 +340,19 @@ class MainWindow(QWidget):
             QMenuBar::item:selected {
                 background-color: #6c5ce7;
                 color: #ffffff;
-                border-radius: 6px;
+                border-radius: 0px;
             }
             
             QMenu {
                 background-color: #1a1a24;
-                border: 1px solid rgba(255, 255, 255, 0.1);
-                border-radius: 8px;
-                padding: 6px;
+                border: 1px solid #444;
+                border-radius: 0px;
+                padding: 4px;
             }
             
             QMenu::item {
                 padding: 8px 16px;
-                border-radius: 6px;
+                border-radius: 0px;
                 color: #e8e8ed;
             }
             
@@ -379,7 +431,8 @@ class MainWindow(QWidget):
         input_row.addWidget(self.input_edit)
         
         browse_input = QPushButton("浏览")
-        browse_input.setFixedWidth(55)
+        browse_input.setFixedWidth(70)
+        browse_input.setMinimumWidth(60)
         browse_input.clicked.connect(self._select_input)
         browse_input.setObjectName("secondaryBtn")
         input_row.addWidget(browse_input)
@@ -397,7 +450,8 @@ class MainWindow(QWidget):
         output_row.addWidget(self.output_edit)
         
         browse_output = QPushButton("浏览")
-        browse_output.setFixedWidth(55)
+        browse_output.setFixedWidth(70)
+        browse_output.setMinimumWidth(60)
         browse_output.clicked.connect(self._select_output)
         browse_output.setObjectName("secondaryBtn")
         output_row.addWidget(browse_output)
@@ -429,7 +483,8 @@ class MainWindow(QWidget):
         
         save_preset_btn = QPushButton("保存")
         save_preset_btn.setObjectName("secondaryBtn")
-        save_preset_btn.setFixedWidth(55)
+        save_preset_btn.setFixedWidth(70)
+        save_preset_btn.setMinimumWidth(60)
         save_preset_btn.clicked.connect(self._save_preset)
         preset_row.addWidget(save_preset_btn)
         
