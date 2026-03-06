@@ -15,7 +15,7 @@ jobs:
           - runner: macos-15
             py_arch: arm64
             pkg_suffix: arm64
-          - runner: macos-13
+          - runner: macos-15-intel
             py_arch: x64
             pkg_suffix: x64
     runs-on: ${{ matrix.runner }}
