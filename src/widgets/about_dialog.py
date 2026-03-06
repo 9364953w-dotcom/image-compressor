@@ -1,5 +1,5 @@
 """
-关于对话框 - 与主程序一致的专业风格
+关于对话框 - 主题跟随主窗口
 """
 
 import platform
@@ -17,68 +17,41 @@ from PyQt5.QtWidgets import (
 )
 
 from src.config import APP_NAME, __version__
+from src.widgets.theme import ThemeTokens, build_dialog_stylesheet
 
 
 class AboutDialog(QDialog):
-    """精简且专业的关于窗口。"""
+    """精简且专业的关于窗口，样式跟随主题。"""
 
-    def __init__(self, parent=None):
+    def __init__(self, tokens: ThemeTokens, parent=None):
         super().__init__(parent)
         self.setWindowTitle("关于")
-        self.setFixedSize(560, 420)
-        self._setup_style()
+        self.setFixedSize(560, 440)
+        self.setStyleSheet(build_dialog_stylesheet(tokens))
+        self._tokens = tokens
         self._setup_ui()
-
-    def _setup_style(self) -> None:
-        self.setStyleSheet(
-            """
-            QDialog { background-color: #1f1f1f; color: #f2f2f2; }
-            QLabel { background: transparent; color: #f2f2f2; }
-            QLabel#title { font-size: 22px; font-weight: 700; color: #f39c12; }
-            QLabel#subtitle { font-size: 13px; color: #b5b5b5; }
-            QFrame#card {
-                background-color: #2a2a2a;
-                border: 1px solid #4a4a4a;
-                border-radius: 6px;
-            }
-            QLabel#key { color: #b5b5b5; font-weight: 600; }
-            QLabel#value { color: #f2f2f2; }
-            QPushButton {
-                background-color: #333333;
-                border: 1px solid #4a4a4a;
-                border-radius: 4px;
-                color: #f2f2f2;
-                padding: 6px 14px;
-            }
-            QPushButton:hover { background-color: #4a4a4a; }
-            QPushButton#primary {
-                background-color: #f39c12;
-                border-color: #f39c12;
-                color: #1a1a1a;
-                font-weight: 700;
-            }
-            """
-        )
 
     def _setup_ui(self) -> None:
         root = QVBoxLayout(self)
-        root.setContentsMargins(18, 18, 18, 18)
-        root.setSpacing(12)
+        root.setContentsMargins(20, 20, 20, 20)
+        root.setSpacing(14)
 
         title = QLabel(APP_NAME)
         title.setObjectName("title")
-        subtitle = QLabel(f"版本 {__version__}")
-        subtitle.setObjectName("subtitle")
+        root.addWidget(title)
+
+        version_label = QLabel(f"版本 {__version__}")
+        version_label.setObjectName("valueAccent")
+        root.addWidget(version_label)
+
         desc = QLabel("专业的批量图片压缩与格式处理工具")
         desc.setObjectName("subtitle")
-        root.addWidget(title)
-        root.addWidget(subtitle)
         root.addWidget(desc)
 
         info_card = QFrame()
         info_card.setObjectName("card")
         info_layout = QGridLayout(info_card)
-        info_layout.setContentsMargins(12, 12, 12, 12)
+        info_layout.setContentsMargins(14, 14, 14, 14)
         info_layout.setHorizontalSpacing(18)
         info_layout.setVerticalSpacing(10)
 
@@ -105,17 +78,20 @@ class AboutDialog(QDialog):
         support_card = QFrame()
         support_card.setObjectName("card")
         support_layout = QVBoxLayout(support_card)
-        support_layout.setContentsMargins(12, 12, 12, 12)
+        support_layout.setContentsMargins(14, 14, 14, 14)
         support_layout.setSpacing(8)
         support_layout.addWidget(QLabel("技术支持与反馈："))
 
         link = QLabel(
-            "<a style='color:#f39c12;' href='https://github.com/9364953w-dotcom/image-compressor'>"
-            "github.com/9364953w-dotcom/image-compressor</a>"
+            f"<a style='color:{self._tokens.accent};' "
+            f"href='https://github.com/9364953w-dotcom/image-compressor'>"
+            f"github.com/9364953w-dotcom/image-compressor</a>"
         )
         link.setOpenExternalLinks(True)
         support_layout.addWidget(link)
         root.addWidget(support_card)
+
+        root.addStretch()
 
         btn_row = QHBoxLayout()
         btn_row.addStretch()
@@ -127,5 +103,6 @@ class AboutDialog(QDialog):
         close_btn.setObjectName("primary")
         close_btn.clicked.connect(self.accept)
         btn_row.addWidget(github_btn)
+        btn_row.addSpacing(8)
         btn_row.addWidget(close_btn)
         root.addLayout(btn_row)

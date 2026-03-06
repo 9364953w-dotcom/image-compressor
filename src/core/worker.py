@@ -4,6 +4,7 @@
 
 import os
 import time
+import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -42,6 +43,8 @@ class CompressWorker(QObject):
         keep_exif: bool = True,
         auto_rotate: bool = True,
         incremental: bool = True,
+        max_retries: int = 1,
+        backup_set: Optional[Path] = None,
     ):
         super().__init__()
         self.input_dir = input_dir
@@ -60,17 +63,32 @@ class CompressWorker(QObject):
         self.keep_exif = keep_exif
         self.auto_rotate = auto_rotate
         self.incremental = incremental
+        self.max_retries = max_retries
+        self.backup_set = backup_set
 
         self._is_canceled = False
+        self._pause_event = threading.Event()
+        self._pause_event.set()
         self._executor: Optional[ThreadPoolExecutor] = None
 
     def cancel(self) -> None:
-        """取消压缩任务"""
         self._is_canceled = True
+        self._pause_event.set()
         self.state_changed.emit("Canceling", {})
 
+    def pause(self) -> None:
+        self._pause_event.clear()
+        self.state_changed.emit("Paused", {})
+
+    def resume(self) -> None:
+        self._pause_event.set()
+        self.state_changed.emit("Running", {})
+
+    @property
+    def is_paused(self) -> bool:
+        return not self._pause_event.is_set()
+
     def calculate_optimal_workers(self, files: List[Path]) -> int:
-        """根据文件规模动态计算线程数"""
         if not DYNAMIC_THREADING or not files:
             return MAX_WORKERS or os.cpu_count() or 4
 
@@ -86,8 +104,18 @@ class CompressWorker(QObject):
             return min(cpu_count * 2, 16)
         return cpu_count
 
+    def _compress_with_retry(self, *args, **kwargs):
+        last_exc = None
+        for attempt in range(self.max_retries + 1):
+            try:
+                return compress_image(*args, **kwargs), attempt
+            except Exception as exc:
+                last_exc = exc
+                if attempt < self.max_retries:
+                    time.sleep(0.5)
+        raise last_exc
+
     def run(self) -> None:
-        """执行批量压缩任务"""
         start_ts = time.time()
         self.state_changed.emit("Validating", {})
 
@@ -138,7 +166,7 @@ class CompressWorker(QObject):
             self._executor = executor
             future_to_meta = {
                 executor.submit(
-                    compress_image,
+                    self._compress_with_retry,
                     file_path,
                     input_path,
                     output_path,
@@ -156,17 +184,28 @@ class CompressWorker(QObject):
                     settings_hash if self.incremental else None,
                     self.keep_exif,
                     self.auto_rotate,
+                    self.backup_set,
                 ): (index, file_path)
                 for index, file_path in enumerate(all_files)
             }
 
             completed = 0
             for future in as_completed(future_to_meta):
+                self._pause_event.wait()
                 if self._is_canceled:
                     break
 
                 index, _ = future_to_meta[future]
-                src_path, status, orig_size, new_size, details = future.result()
+                try:
+                    (src_path, status, orig_size, new_size, details), retry_count = future.result()
+                except Exception:
+                    src_path = _
+                    status = "failed"
+                    orig_size = 0
+                    new_size = 0
+                    details = {}
+                    retry_count = self.max_retries
+
                 status_counter[status] = status_counter.get(status, 0) + 1
 
                 if status in {"processed", "cached"}:
@@ -176,11 +215,12 @@ class CompressWorker(QObject):
                 record = {
                     "index": index + 1,
                     "path": str(src_path),
-                    "filename": src_path.name,
+                    "filename": src_path.name if hasattr(src_path, "name") else str(src_path),
                     "status": status,
                     "original_size": orig_size,
                     "compressed_size": new_size,
                     "details": details,
+                    "retry_count": retry_count,
                 }
                 detailed_stats.append(record)
                 self.file_completed.emit(record)
@@ -196,7 +236,7 @@ class CompressWorker(QObject):
                         "current": completed,
                         "total": total,
                         "percent": int(completed / total * 100),
-                        "message": f"[{completed}/{total}] {status}: {src_path.name}",
+                        "message": f"[{completed}/{total}] {status}: {src_path.name if hasattr(src_path, 'name') else src_path}",
                         "rate": rate,
                         "eta_seconds": eta_seconds,
                     }
@@ -234,7 +274,6 @@ class CompressWorker(QObject):
         self.finished.emit(payload)
 
     def _collect_images(self, input_path: Path, include_subdirs: bool) -> List[Path]:
-        """收集所有图片文件"""
         if include_subdirs:
             files = [p for p in input_path.rglob("*") if p.is_file() and p.suffix.lower() in IMAGE_EXTENSIONS]
         else:

@@ -2,6 +2,7 @@
 图片压缩核心逻辑模块
 """
 
+import json
 import logging
 import os
 import shutil
@@ -18,10 +19,16 @@ from src.config import (
     config_manager,
 )
 
-# 解除 Pillow 图像尺寸限制
-Image.MAX_IMAGE_PIXELS = None
-# 确保加载所有图像插件
+Image.MAX_IMAGE_PIXELS = 300_000_000
 ImageFile.LOAD_TRUNCATED_IMAGES = True
+
+_HEIF_AVAILABLE = False
+try:
+    import pillow_heif
+    pillow_heif.register_heif_opener()
+    _HEIF_AVAILABLE = True
+except ImportError:
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -237,6 +244,7 @@ def compress_image(
     settings_hash: Optional[str] = None,
     keep_exif: bool = True,
     auto_rotate: bool = True,
+    backup_set: Optional[Path] = None,
 ) -> Tuple[Path, CompressStatus, int, int, Dict[str, Any]]:
     """
     压缩单张图片
@@ -305,11 +313,14 @@ def compress_image(
         details["format_after"] = output_ext
         
         # 确定输出路径
+        format_changed = output_ext != suffix
         if overwrite:
-            dst_path = src_path
+            if format_changed:
+                dst_path = src_path.with_suffix(output_ext)
+            else:
+                dst_path = src_path
         else:
             rel_path = src_path.relative_to(input_root)
-            # 应用重命名模式
             if rename_pattern and rename_pattern != "{name}":
                 from datetime import datetime
                 name_without_ext = src_path.stem
@@ -323,27 +334,23 @@ def compress_image(
                 details["renamed"] = True
                 details["new_name"] = new_name
             else:
-                # 只改扩展名
-                if output_ext != suffix:
+                if format_changed:
                     rel_path = rel_path.with_suffix(output_ext)
             
             dst_path = output_root / rel_path
         
-        # 检查文件是否已存在（非覆盖模式下跳过）
         if not overwrite and dst_path.exists():
             existing_size = dst_path.stat().st_size
             return src_path, "skipped", orig_size, existing_size, details
         
-        # 创建目标目录
         if not overwrite:
             dst_path.parent.mkdir(parents=True, exist_ok=True)
         
-        # 覆盖模式下使用临时文件
         temp_path = None
         actual_save_path = dst_path
         if overwrite:
             temp_fd, temp_path_str = tempfile.mkstemp(
-                suffix=src_path.suffix,
+                suffix=output_ext,
                 dir=src_path.parent,
                 prefix=f".{src_path.stem}_temp_"
             )
@@ -407,19 +414,16 @@ def compress_image(
             
             # 保存图片
             if smart_mode and target_size_kb > 0 and actual_format in ('jpeg', 'webp'):
-                # 智能压缩模式
                 success, new_size = smart_compress(
-                    img, actual_save_path, target_size_kb, 
+                    img, actual_save_path, target_size_kb,
                     output_format=actual_format
                 )
                 if not success:
-                    # 智能压缩失败，使用普通压缩
                     if actual_format == 'jpeg':
                         _save_jpeg(img, actual_save_path, quality, keep_exif)
                     else:
                         _save_webp(img, actual_save_path, quality, keep_exif)
             else:
-                # 普通压缩模式
                 if actual_format in ('jpg', 'jpeg'):
                     _save_jpeg(img, actual_save_path, quality, keep_exif)
                     details["quality_used"] = quality
@@ -428,19 +432,44 @@ def compress_image(
                 elif actual_format == 'webp':
                     _save_webp(img, actual_save_path, quality, keep_exif)
                     details["quality_used"] = quality
+                elif actual_format == 'avif':
+                    _save_avif(img, actual_save_path, quality, keep_exif)
+                    details["quality_used"] = quality
+                elif actual_format in ('heif', 'heic'):
+                    _save_heif(img, actual_save_path, quality, keep_exif)
+                    details["quality_used"] = quality
                 else:
                     img.save(actual_save_path)
         
         # 覆盖模式下替换原文件
         if overwrite and temp_path:
-            backup_path = src_path.with_suffix(f"{src_path.suffix}.backup")
+            local_backup = src_path.with_suffix(f"{src_path.suffix}.backup")
             try:
-                shutil.copy2(src_path, backup_path)
-                shutil.move(str(temp_path), str(src_path))
-                backup_path.unlink(missing_ok=True)
+                shutil.copy2(src_path, local_backup)
+
+                if backup_set and backup_set.is_dir():
+                    backup_name = f"{file_index:06d}_{src_path.name}"
+                    shutil.copy2(str(local_backup), str(backup_set / backup_name))
+                    manifest_file = backup_set / "_manifest.json"
+                    manifest = []
+                    if manifest_file.exists():
+                        with open(manifest_file, "r", encoding="utf-8") as mf:
+                            manifest = json.load(mf)
+                    manifest.append({
+                        "backup_name": backup_name,
+                        "original_path": str(src_path),
+                        "new_path": str(dst_path),
+                    })
+                    with open(manifest_file, "w", encoding="utf-8") as mf:
+                        json.dump(manifest, mf, ensure_ascii=False, indent=2)
+
+                shutil.move(str(temp_path), str(dst_path))
+                local_backup.unlink(missing_ok=True)
+                if format_changed and src_path.exists() and src_path != dst_path:
+                    src_path.unlink()
             except Exception as e:
-                if backup_path.exists():
-                    shutil.move(str(backup_path), str(src_path))
+                if local_backup.exists():
+                    shutil.move(str(local_backup), str(src_path))
                 raise e
         
         new_size = dst_path.stat().st_size
@@ -509,4 +538,30 @@ def _save_webp(img: Image.Image, dst_path: Path, quality: int, keep_exif: bool =
         if exif is not None:
             save_kwargs["exif"] = exif
     
+    img.save(dst_path, **save_kwargs)
+
+
+def _save_avif(img: Image.Image, dst_path: Path, quality: int, keep_exif: bool = True) -> None:
+    if not _HEIF_AVAILABLE:
+        raise RuntimeError("pillow-heif 未安装，无法保存 AVIF 格式")
+    save_kwargs = {"format": "AVIF", "quality": quality}
+    if keep_exif:
+        exif = img.info.get("exif")
+        if exif is not None:
+            save_kwargs["exif"] = exif
+    if img.mode not in ("RGB", "RGBA"):
+        img = img.convert("RGB")
+    img.save(dst_path, **save_kwargs)
+
+
+def _save_heif(img: Image.Image, dst_path: Path, quality: int, keep_exif: bool = True) -> None:
+    if not _HEIF_AVAILABLE:
+        raise RuntimeError("pillow-heif 未安装，无法保存 HEIF 格式")
+    save_kwargs = {"format": "HEIF", "quality": quality}
+    if keep_exif:
+        exif = img.info.get("exif")
+        if exif is not None:
+            save_kwargs["exif"] = exif
+    if img.mode not in ("RGB", "RGBA"):
+        img = img.convert("RGB")
     img.save(dst_path, **save_kwargs)

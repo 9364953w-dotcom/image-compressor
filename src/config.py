@@ -8,13 +8,13 @@ from pathlib import Path
 from typing import Dict, List, Any
 
 # 版本信息
-__version__ = "1.3.5"
+__version__ = "1.4.0"
 APP_NAME = "图片批量压缩工具"
 BUNDLE_ID = "com.wang.imagecompressor"
 
 # 支持的图片格式
-IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.webp', '.bmp', '.tiff', '.tif'}
-OUTPUT_FORMATS = ['original', 'jpg', 'png', 'webp']
+IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.webp', '.bmp', '.tiff', '.tif', '.avif', '.heif', '.heic'}
+OUTPUT_FORMATS = ['original', 'jpg', 'png', 'webp', 'avif', 'heif']
 
 # 压缩参数默认值
 DEFAULT_QUALITY = 90
@@ -47,6 +47,19 @@ MAX_HISTORY_ITEMS = 10
 # 预设配置
 PRESETS_FILE = ".presets.json"
 UI_SETTINGS_FILE = ".ui_settings.json"
+TASK_HISTORY_FILE = ".task_history.json"
+BACKUP_DIR_NAME = ".backups"
+MAX_TASK_HISTORY = 50
+MAX_BACKUP_SETS = 5
+
+# 重命名显示名
+RENAME_PATTERN_LABELS = [
+    ("保持原文件名", "{name}"),
+    ("原文件名_序号", "{name}_{index:03d}"),
+    ("纯序号", "{index:03d}"),
+    ("前缀+序号", "{prefix}{index:03d}"),
+    ("日期+序号", "{date}_{index:03d}"),
+]
 DEFAULT_PRESETS = [
     {
         "name": "网页用",
@@ -308,6 +321,97 @@ class ConfigManager:
                 json.dump(settings, f, ensure_ascii=False, indent=2)
         except Exception:
             pass
+
+    # ========== 任务历史 ==========
+
+    def load_task_records(self) -> List[Dict[str, Any]]:
+        task_file = self.config_dir / TASK_HISTORY_FILE
+        if not task_file.exists():
+            return []
+        try:
+            with open(task_file, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return []
+
+    def save_task_record(self, record: Dict[str, Any]) -> None:
+        records = self.load_task_records()
+        records.append(record)
+        records = records[-MAX_TASK_HISTORY:]
+        task_file = self.config_dir / TASK_HISTORY_FILE
+        try:
+            with open(task_file, "w", encoding="utf-8") as f:
+                json.dump(records, f, ensure_ascii=False, indent=2)
+        except Exception:
+            pass
+
+    def clear_task_records(self) -> None:
+        task_file = self.config_dir / TASK_HISTORY_FILE
+        try:
+            task_file.unlink(missing_ok=True)
+        except Exception:
+            pass
+
+    # ========== 备份管理 ==========
+
+    @property
+    def backup_dir(self) -> Path:
+        return self.config_dir / BACKUP_DIR_NAME
+
+    def create_backup_set(self) -> Path:
+        """创建一个带时间戳的备份子目录"""
+        from datetime import datetime
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_set = self.backup_dir / ts
+        backup_set.mkdir(parents=True, exist_ok=True)
+        self._cleanup_old_backups()
+        return backup_set
+
+    def get_latest_backup(self) -> "Path | None":
+        if not self.backup_dir.exists():
+            return None
+        sets = sorted(self.backup_dir.iterdir(), reverse=True)
+        for s in sets:
+            if s.is_dir() and any(s.iterdir()):
+                return s
+        return None
+
+    def restore_backup(self, backup_set: Path) -> List[str]:
+        """从备份集还原文件，返回还原的文件路径列表"""
+        import shutil as _shutil
+        restored = []
+        manifest_file = backup_set / "_manifest.json"
+        if not manifest_file.exists():
+            return restored
+        try:
+            with open(manifest_file, "r", encoding="utf-8") as f:
+                manifest = json.load(f)
+            for entry in manifest:
+                backup_file = backup_set / entry["backup_name"]
+                original_path = Path(entry["original_path"])
+                if backup_file.exists():
+                    original_path.parent.mkdir(parents=True, exist_ok=True)
+                    _shutil.copy2(str(backup_file), str(original_path))
+                    new_path = entry.get("new_path")
+                    if new_path and Path(new_path).exists() and new_path != entry["original_path"]:
+                        Path(new_path).unlink(missing_ok=True)
+                    restored.append(str(original_path))
+            _shutil.rmtree(str(backup_set), ignore_errors=True)
+        except Exception:
+            pass
+        return restored
+
+    def _cleanup_old_backups(self) -> None:
+        if not self.backup_dir.exists():
+            return
+        import shutil as _shutil
+        sets = sorted(
+            [d for d in self.backup_dir.iterdir() if d.is_dir()],
+            key=lambda p: p.name,
+        )
+        while len(sets) > MAX_BACKUP_SETS:
+            oldest = sets.pop(0)
+            _shutil.rmtree(str(oldest), ignore_errors=True)
 
 
 # 全局配置管理器实例

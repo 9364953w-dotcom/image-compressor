@@ -72,6 +72,7 @@ class StatsPanel(QWidget):
         filter_row.addStretch()
         self.export_btn = QPushButton("导出统计")
         self.export_btn.setEnabled(False)
+        self.export_btn.setToolTip("导出压缩统计为 CSV 文件 (Ctrl+E)")
         filter_row.addWidget(self.export_btn)
         detail_layout.addLayout(filter_row)
 

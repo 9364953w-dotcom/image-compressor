@@ -17,9 +17,11 @@ from PyQt5.QtWidgets import (
     QSpinBox,
     QCheckBox,
     QScrollArea,
+    QLineEdit,
 )
 
-from src.config import DEFAULT_MIN_SIZE_MB, DEFAULT_QUALITY
+from src.config import DEFAULT_MIN_SIZE_MB, DEFAULT_QUALITY, RENAME_PATTERN_LABELS
+from src.widgets.compare_slider import CompareSlider
 
 
 class SettingsPanel(QWidget):
@@ -49,6 +51,7 @@ class SettingsPanel(QWidget):
 
         preview_row = QHBoxLayout()
         self.exif_btn = QPushButton("查看 EXIF")
+        self.exif_btn.setToolTip("查看选中图片的 EXIF 信息")
         preview_row.addWidget(self.exif_btn)
         preview_row.addStretch()
         top_layout.addLayout(preview_row)
@@ -75,7 +78,7 @@ class SettingsPanel(QWidget):
         row1 = QHBoxLayout()
         row1.addWidget(QLabel("格式"))
         self.format_combo = QComboBox()
-        self.format_combo.addItems(["保持原格式", "JPG", "PNG", "WebP"])
+        self.format_combo.addItems(["保持原格式", "JPG", "PNG", "WebP", "AVIF", "HEIF"])
         row1.addWidget(self.format_combo)
         row1.addWidget(QLabel("最小体积"))
         self.min_size_spin = QDoubleSpinBox()
@@ -151,30 +154,57 @@ class SettingsPanel(QWidget):
         row5.addStretch()
         settings_layout.addLayout(row5)
 
+        rename_row = QHBoxLayout()
+        rename_row.addWidget(QLabel("重命名"))
+        self.rename_combo = QComboBox()
+        for label, _pattern in RENAME_PATTERN_LABELS:
+            self.rename_combo.addItem(label)
+        rename_row.addWidget(self.rename_combo)
+        rename_row.addWidget(QLabel("前缀"))
+        self.rename_prefix_edit = QLineEdit()
+        self.rename_prefix_edit.setPlaceholderText("自定义前缀")
+        self.rename_prefix_edit.setMaximumWidth(120)
+        self.rename_prefix_edit.setEnabled(False)
+        rename_row.addWidget(self.rename_prefix_edit)
+        rename_row.addStretch()
+        settings_layout.addLayout(rename_row)
+
+        adv_row = QHBoxLayout()
+        adv_row.addWidget(QLabel("失败重试"))
+        self.retry_spin = QSpinBox()
+        self.retry_spin.setRange(0, 3)
+        self.retry_spin.setValue(1)
+        self.retry_spin.setSuffix(" 次")
+        self.retry_spin.setButtonSymbols(QAbstractSpinBox.UpDownArrows)
+        adv_row.addWidget(self.retry_spin)
+        adv_row.addStretch()
+        settings_layout.addLayout(adv_row)
+
         root.addWidget(settings_group, 0)
 
-        preview_group = QGroupBox("实时预览")
+        preview_group = QGroupBox("实时预览（左原图 / 右压缩后 · 拖动滑块对比 · 滚轮缩放 · 双击切换100%）")
         preview_layout = QVBoxLayout(preview_group)
         preview_layout.setSpacing(6)
 
         preview_toolbar = QHBoxLayout()
-        self.preview_100_cb = QCheckBox("100%显示")
         self.live_preview_cb = QCheckBox("实时预览")
         self.live_preview_cb.setChecked(True)
-        preview_toolbar.addWidget(QLabel("默认显示：压缩后预览"))
-        preview_toolbar.addSpacing(8)
-        preview_toolbar.addWidget(self.preview_100_cb)
         preview_toolbar.addWidget(self.live_preview_cb)
+        preview_toolbar.addSpacing(12)
+        self.zoom_fit_btn = QPushButton("适应窗口")
+        self.zoom_fit_btn.setFixedWidth(72)
+        self.zoom_100_btn = QPushButton("100%")
+        self.zoom_100_btn.setFixedWidth(52)
+        preview_toolbar.addWidget(self.zoom_fit_btn)
+        preview_toolbar.addWidget(self.zoom_100_btn)
         preview_toolbar.addStretch()
         preview_layout.addLayout(preview_toolbar)
 
-        self.preview_area = QScrollArea()
-        self.preview_area.setMinimumHeight(190)
-        self.preview_area.setWidgetResizable(False)
-        self.preview_image_label = QLabel("请选择输入目录后查看预览")
-        self.preview_image_label.setAlignment(Qt.AlignCenter)
-        self.preview_area.setWidget(self.preview_image_label)
-        preview_layout.addWidget(self.preview_area)
+        self.compare_slider = CompareSlider()
+        self.compare_slider.setMinimumHeight(120)
+        self.zoom_fit_btn.clicked.connect(self.compare_slider.zoom_fit)
+        self.zoom_100_btn.clicked.connect(self.compare_slider.zoom_100)
+        preview_layout.addWidget(self.compare_slider, 1)
 
         root.addWidget(preview_group, 1)
 
@@ -182,12 +212,29 @@ class SettingsPanel(QWidget):
         action_layout = QHBoxLayout(action_group)
         action_layout.setContentsMargins(8, 8, 8, 8)
         action_layout.setSpacing(8)
+        self.convert_only_btn = QPushButton("仅转换格式")
+        self.convert_only_btn.setToolTip("只转换图片格式，不压缩质量")
+        self.convert_only_btn.setMinimumHeight(38)
+        self.convert_only_btn.setMinimumWidth(120)
         self.start_btn = QPushButton("开始压缩")
         self.start_btn.setObjectName("primaryBtn")
+        self.start_btn.setToolTip("按照当前参数开始批量压缩 (Ctrl+Enter)")
+        self.start_btn.setMinimumHeight(38)
+        self.start_btn.setMinimumWidth(120)
+        self.pause_btn = QPushButton("暂停")
+        self.pause_btn.setToolTip("暂停/继续当前任务")
+        self.pause_btn.setMinimumHeight(38)
+        self.pause_btn.setEnabled(False)
         self.cancel_btn = QPushButton("取消")
+        self.cancel_btn.setObjectName("dangerBtn")
         self.cancel_btn.setEnabled(False)
+        self.cancel_btn.setToolTip("取消当前压缩任务 (Esc)")
+        self.cancel_btn.setMinimumHeight(38)
+        self.cancel_btn.setMinimumWidth(100)
         action_layout.addStretch()
+        action_layout.addWidget(self.convert_only_btn)
         action_layout.addWidget(self.start_btn)
+        action_layout.addWidget(self.pause_btn)
         action_layout.addWidget(self.cancel_btn)
         root.addWidget(action_group)
 
@@ -198,37 +245,41 @@ class SettingsPanel(QWidget):
         self.smart_cb.toggled.connect(self.target_size_spin.setEnabled)
         self.smart_cb.toggled.connect(lambda checked: self.quality_slider.setEnabled(not checked))
         self.smart_cb.toggled.connect(lambda checked: self.quality_spin.setEnabled(not checked))
+        self.rename_combo.currentIndexChanged.connect(self._on_rename_changed)
 
         self._original_pixmap = None
         self._compressed_pixmap = None
+
+    def _on_rename_changed(self, index: int) -> None:
+        pattern = RENAME_PATTERN_LABELS[index][1] if index < len(RENAME_PATTERN_LABELS) else "{name}"
+        self.rename_prefix_edit.setEnabled("{prefix}" in pattern)
+
+    def rename_pattern_value(self):
+        idx = self.rename_combo.currentIndex()
+        if idx <= 0:
+            return None
+        pattern = RENAME_PATTERN_LABELS[idx][1]
+        if "{prefix}" in pattern:
+            prefix = self.rename_prefix_edit.text().strip()
+            if prefix:
+                pattern = pattern.replace("{prefix}", prefix)
+            else:
+                return None
+        return pattern
 
     def set_preview_images(self, original_pixmap, compressed_pixmap) -> None:
         self._original_pixmap = original_pixmap
         self._compressed_pixmap = compressed_pixmap
-        self.refresh_preview_widget()
+        self.compare_slider.set_images(original_pixmap, compressed_pixmap)
 
     def clear_preview(self, message: str) -> None:
         self._original_pixmap = None
         self._compressed_pixmap = None
-        self.preview_image_label.setText(message)
-        self.preview_image_label.adjustSize()
+        self.compare_slider.clear(message)
 
     def refresh_preview_widget(self) -> None:
-        pixmap = self._compressed_pixmap
-        if pixmap is None or pixmap.isNull():
-            return
-        if self.preview_100_cb.isChecked():
-            self.preview_image_label.setPixmap(pixmap)
-            self.preview_image_label.resize(pixmap.size())
-            return
-
-        viewport = self.preview_area.viewport().size()
-        target_w = max(10, viewport.width() - 8)
-        target_h = max(10, viewport.height() - 8)
-        scaled = pixmap.scaled(target_w, target_h, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-        self.preview_image_label.setPixmap(scaled)
-        self.preview_image_label.resize(scaled.size())
+        if self._original_pixmap and self._compressed_pixmap:
+            self.compare_slider.set_images(self._original_pixmap, self._compressed_pixmap)
 
     def output_format_value(self) -> str:
-        return ["original", "jpg", "png", "webp"][self.format_combo.currentIndex()]
-
+        return ["original", "jpg", "png", "webp", "avif", "heif"][self.format_combo.currentIndex()]

@@ -1,9 +1,12 @@
 """
-主题系统：统一颜色 token 和全局 QSS。
+主题系统：Fusion 风格 + QPalette 驱动，仅保留最小 QSS 覆盖。
+
+原则：所有标准控件（ComboBox、SpinBox、CheckBox、Slider、ScrollBar、
+ProgressBar、TabWidget 等）全部由 Fusion + QPalette 渲染，
+QSS 只用于 QPalette 无法实现的差异化样式。
 """
 
 from dataclasses import dataclass
-from pathlib import Path
 
 
 @dataclass(frozen=True)
@@ -12,9 +15,12 @@ class ThemeTokens:
     bg: str
     surface: str
     surface_alt: str
+    surface_elevated: str
     border: str
     text_primary: str
     text_secondary: str
+    text_muted: str
+    text_on_accent: str
     accent: str
     accent_hover: str
     success: str
@@ -28,9 +34,12 @@ THEMES = {
         bg="#1f1f1f",
         surface="#2a2a2a",
         surface_alt="#333333",
+        surface_elevated="#383838",
         border="#4a4a4a",
         text_primary="#f2f2f2",
         text_secondary="#b5b5b5",
+        text_muted="#8b8b9b",
+        text_on_accent="#1a1a1a",
         accent="#f39c12",
         accent_hover="#ffad33",
         success="#27ae60",
@@ -42,9 +51,12 @@ THEMES = {
         bg="#171a26",
         surface="#20253a",
         surface_alt="#2b3150",
+        surface_elevated="#323966",
         border="#3c4466",
         text_primary="#e7ebff",
         text_secondary="#aab3d9",
+        text_muted="#7a83aa",
+        text_on_accent="#0d0f1a",
         accent="#7f8cff",
         accent_hover="#97a2ff",
         success="#45cf9e",
@@ -56,9 +68,12 @@ THEMES = {
         bg="#ececec",
         surface="#ffffff",
         surface_alt="#f4f4f4",
+        surface_elevated="#fafafa",
         border="#c8c8c8",
         text_primary="#202020",
         text_secondary="#5f5f5f",
+        text_muted="#8a8a8a",
+        text_on_accent="#ffffff",
         accent="#2f80ed",
         accent_hover="#4d94ef",
         success="#1f9d55",
@@ -68,148 +83,142 @@ THEMES = {
 }
 
 
+def build_palette_from_tokens(tokens: ThemeTokens):
+    """根据 ThemeTokens 构建 QPalette，Fusion 风格的全部颜色由此驱动。"""
+    from PyQt5.QtGui import QPalette, QColor
+    from PyQt5.QtCore import Qt
+
+    palette = QPalette()
+
+    palette.setColor(QPalette.Window, QColor(tokens.bg))
+    palette.setColor(QPalette.WindowText, QColor(tokens.text_primary))
+    palette.setColor(QPalette.Base, QColor(tokens.surface_alt))
+    palette.setColor(QPalette.AlternateBase, QColor(tokens.surface))
+    palette.setColor(QPalette.ToolTipBase, QColor(tokens.surface_elevated))
+    palette.setColor(QPalette.ToolTipText, QColor(tokens.text_primary))
+    palette.setColor(QPalette.Text, QColor(tokens.text_primary))
+    palette.setColor(QPalette.Button, QColor(tokens.surface_alt))
+    palette.setColor(QPalette.ButtonText, QColor(tokens.text_primary))
+    palette.setColor(QPalette.BrightText, QColor(tokens.error))
+    palette.setColor(QPalette.Highlight, QColor(tokens.accent))
+    palette.setColor(QPalette.HighlightedText, QColor(tokens.text_on_accent))
+    palette.setColor(QPalette.Link, QColor(tokens.accent))
+    palette.setColor(QPalette.Mid, QColor(tokens.border))
+    palette.setColor(QPalette.Dark, QColor(tokens.border))
+    palette.setColor(QPalette.Shadow, QColor(tokens.bg))
+    palette.setColor(QPalette.Light, QColor(tokens.surface_elevated))
+    palette.setColor(QPalette.Midlight, QColor(tokens.surface))
+
+    palette.setColor(QPalette.Disabled, QPalette.Text, QColor(tokens.text_muted))
+    palette.setColor(QPalette.Disabled, QPalette.ButtonText, QColor(tokens.text_muted))
+    palette.setColor(QPalette.Disabled, QPalette.WindowText, QColor(tokens.text_muted))
+    palette.setColor(QPalette.Disabled, QPalette.Highlight, QColor(tokens.border))
+
+    return palette
+
+
 def build_stylesheet(tokens: ThemeTokens) -> str:
-    """根据主题 token 生成全局样式。"""
-    resources_dir = Path(__file__).resolve().parents[1] / "resources"
-    up_arrow = (resources_dir / "spin_up.svg").as_posix()
-    down_arrow = (resources_dir / "spin_down.svg").as_posix()
+    """最小 QSS：只包含 QPalette 无法实现的差异化样式。"""
     return f"""
-QMainWindow, QWidget {{
-    background-color: {tokens.bg};
-    color: {tokens.text_primary};
-    font-size: 13px;
-}}
-QLabel {{
-    background-color: transparent;
-}}
-QMenuBar, QMenu, QStatusBar, QToolBar {{
-    background-color: {tokens.surface};
-    color: {tokens.text_primary};
-}}
-QMenuBar::item:selected, QMenu::item:selected {{
-    background-color: {tokens.surface_alt};
-}}
-QGroupBox {{
-    background-color: {tokens.surface};
-    border: 1px solid {tokens.border};
-    border-radius: 6px;
-    margin-top: 10px;
-    padding: 10px;
-    font-weight: 600;
-}}
-QGroupBox::title {{
-    subcontrol-origin: margin;
-    left: 10px;
-    padding: 0 4px;
-    color: {tokens.text_secondary};
-}}
+/* ── QLabel 按 objectName 区分颜色（QPalette 不支持） ── */
 QLabel#subtle {{
     color: {tokens.text_secondary};
 }}
-QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QTextEdit, QListWidget, QTableWidget {{
-    background-color: {tokens.surface_alt};
-    color: {tokens.text_primary};
-    border: 1px solid {tokens.border};
-    border-radius: 4px;
-    padding: 5px;
+QLabel#muted {{
+    color: {tokens.text_muted};
 }}
-QCheckBox {{
-    background-color: transparent;
-    border: none;
-    spacing: 6px;
-    padding: 0;
-}}
-QCheckBox::indicator {{
-    width: 14px;
-    height: 14px;
-    border: 1px solid #8f8f8f;
-    border-radius: 3px;
-    background-color: #1b1b1b;
-}}
-QCheckBox::indicator:hover {{
-    border-color: {tokens.accent_hover};
-}}
-QCheckBox::indicator:checked {{
-    background-color: {tokens.accent};
-    border-color: {tokens.accent};
-}}
-QSpinBox, QDoubleSpinBox {{
-    padding-right: 20px;
-}}
-QSpinBox::up-button, QDoubleSpinBox::up-button,
-QSpinBox::down-button, QDoubleSpinBox::down-button {{
-    width: 18px;
-}}
-QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {{
-    image: url("{up_arrow}");
-    width: 12px;
-    height: 12px;
-}}
-QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {{
-    image: url("{down_arrow}");
-    width: 12px;
-    height: 12px;
-}}
-QSlider {{
-    background-color: transparent;
-}}
-QSlider::groove:horizontal {{
-    height: 4px;
-    border-radius: 2px;
-    background-color: {tokens.border};
-}}
-QSlider::sub-page:horizontal {{
-    background-color: {tokens.accent};
-    border-radius: 2px;
-}}
-QSlider::handle:horizontal {{
-    width: 12px;
-    margin: -5px 0;
-    border-radius: 6px;
-    background: {tokens.accent_hover};
-}}
-QHeaderView::section {{
-    background-color: {tokens.surface};
+QLabel#badge {{
     color: {tokens.text_secondary};
+    background-color: {tokens.surface};
     border: 1px solid {tokens.border};
-    padding: 6px;
+    border-radius: 3px;
+    padding: 2px 8px;
+    font-size: 12px;
 }}
-QPushButton {{
-    background-color: {tokens.surface_alt};
-    color: {tokens.text_primary};
-    border: 1px solid {tokens.border};
-    border-radius: 4px;
-    padding: 6px 12px;
+QLabel#signatureLabel {{
+    color: {tokens.text_muted};
+    padding-right: 8px;
 }}
-QPushButton:hover {{
-    background-color: {tokens.border};
-}}
+
+/* ── QPushButton 按 objectName 区分主/危险按钮（QPalette 不支持） ── */
 QPushButton#primaryBtn {{
     background-color: {tokens.accent};
-    color: #1a1a1a;
-    border-color: {tokens.accent};
+    color: {tokens.text_on_accent};
+    border: 1px solid {tokens.accent};
     font-weight: 700;
 }}
 QPushButton#primaryBtn:hover {{
     background-color: {tokens.accent_hover};
+    border-color: {tokens.accent_hover};
+}}
+QPushButton#primaryBtn:pressed {{
+    background-color: {tokens.accent};
+    border-color: {tokens.accent};
 }}
 QPushButton#dangerBtn {{
     background-color: {tokens.error};
+    color: {tokens.text_on_accent};
+    border: 1px solid {tokens.error};
+}}
+QPushButton#dangerBtn:hover {{
+    background-color: {tokens.error};
     border-color: {tokens.error};
-    color: white;
-}}
-QProgressBar {{
-    background-color: {tokens.surface_alt};
-    border: 1px solid {tokens.border};
-    border-radius: 4px;
-    text-align: center;
-}}
-QProgressBar::chunk {{
-    background-color: {tokens.accent};
-    border-radius: 3px;
-}}
-QSplitter::handle {{
-    background-color: transparent;
 }}
 """
 
+
+def build_dialog_stylesheet(tokens: ThemeTokens) -> str:
+    """对话框最小 QSS：只包含 QPalette 无法实现的 QLabel / QFrame 差异化样式。"""
+    return f"""
+/* ── QLabel 差异化 ── */
+QLabel#title {{
+    font-size: 22px;
+    font-weight: 700;
+    color: {tokens.accent};
+}}
+QLabel#subtitle {{
+    font-size: 13px;
+    color: {tokens.text_secondary};
+}}
+QLabel#key {{
+    color: {tokens.text_secondary};
+    font-weight: 600;
+}}
+QLabel#valueAccent {{
+    color: {tokens.accent};
+    font-weight: 500;
+}}
+QLabel#muted {{
+    color: {tokens.text_muted};
+}}
+QLabel#titleLabel {{
+    font-size: 16px;
+    font-weight: 700;
+}}
+QLabel#valueLabel {{
+    color: {tokens.accent};
+    font-weight: 500;
+}}
+
+/* ── QFrame 卡片（QPalette 无法按 objectName 区分） ── */
+QFrame#card {{
+    background-color: {tokens.surface};
+    border: 1px solid {tokens.border};
+    border-radius: 6px;
+}}
+
+/* ── QPushButton 差异化 ── */
+QPushButton#primary {{
+    background-color: {tokens.accent};
+    color: {tokens.text_on_accent};
+    border: 1px solid {tokens.accent};
+    font-weight: 700;
+}}
+QPushButton#primary:hover {{
+    background-color: {tokens.accent_hover};
+    border-color: {tokens.accent_hover};
+}}
+QPushButton#secondaryBtn:hover {{
+    background-color: {tokens.border};
+}}
+"""
