@@ -10,12 +10,25 @@ from src.config import LOG_FILE, LOG_LEVEL, LOG_FORMAT
 
 def setup_logging() -> logging.Logger:
     """配置并返回日志记录器"""
-    logging.basicConfig(
-        filename=LOG_FILE,
-        level=getattr(logging, LOG_LEVEL),
-        format=LOG_FORMAT,
-        encoding='utf-8'
-    )
+    level = getattr(logging, LOG_LEVEL, logging.ERROR)
+    log_path = Path(LOG_FILE)
+    if not log_path.is_absolute():
+        log_path = Path.home() / ".image-compressor" / log_path.name
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+
+    try:
+        logging.basicConfig(
+            filename=str(log_path),
+            level=level,
+            format=LOG_FORMAT,
+            encoding="utf-8",
+        )
+    except OSError:
+        # 某些打包运行环境可能只读，回退到 stderr，避免程序启动失败
+        logging.basicConfig(
+            level=level,
+            format=LOG_FORMAT,
+        )
     return logging.getLogger(__name__)
 
 
