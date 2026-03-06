@@ -8,7 +8,17 @@ on:
 
 jobs:
   build-macos:
-    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            py_arch: arm64
+            pkg_suffix: arm64
+          - runner: macos-13
+            py_arch: x64
+            pkg_suffix: x64
+    runs-on: ${{ matrix.runner }}
     steps:
     - name: Checkout
       uses: actions/checkout@v4
@@ -17,6 +27,7 @@ jobs:
       uses: actions/setup-python@v5
       with:
         python-version: '3.11'
+        architecture: ${{ matrix.py_arch }}
     
     - name: Install dependencies
       run: |
@@ -37,13 +48,13 @@ jobs:
     - name: Create ZIP
       run: |
         cd dist
-        zip -r "ImageCompressor-macOS.zip" "ImageCompressor.app"
+        zip -r "ImageCompressor-macOS-${{ matrix.pkg_suffix }}.zip" "ImageCompressor.app"
     
     - name: Upload macOS Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: macos-build
-        path: dist/ImageCompressor-macOS.zip
+        name: macos-build-${{ matrix.pkg_suffix }}
+        path: dist/ImageCompressor-macOS-${{ matrix.pkg_suffix }}.zip
 
   build-windows:
     runs-on: windows-latest
@@ -93,7 +104,12 @@ jobs:
     - name: Download macOS Artifact
       uses: actions/download-artifact@v4
       with:
-        name: macos-build
+        name: macos-build-arm64
+
+    - name: Download macOS Intel Artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: macos-build-x64
     
     - name: Download Windows Artifact
       uses: actions/download-artifact@v4
@@ -107,7 +123,8 @@ jobs:
       uses: softprops/action-gh-release@v1
       with:
         files: |
-          ImageCompressor-macOS.zip
+          ImageCompressor-macOS-arm64.zip
+          ImageCompressor-macOS-x64.zip
           ImageCompressor-Windows.zip
         generate_release_notes: true
       env:

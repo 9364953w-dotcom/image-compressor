@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Dict, List, Any
 
 # 版本信息
-__version__ = "1.3.1"
+__version__ = "1.3.2"
 APP_NAME = "图片批量压缩工具"
 BUNDLE_ID = "com.wang.imagecompressor"
 

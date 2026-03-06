@@ -1,4 +1,4 @@
-# 图片批量压缩工具 v1.3.1
+# 图片批量压缩工具 v1.3.2
 
 一个基于 PyQt5 的图形化图片批量压缩工具，支持多线程并行处理、智能压缩、格式转换、预设配置、EXIF 处理等高级功能。
 
@@ -9,7 +9,8 @@
 ## ⬇️ 快速下载
 
 - [前往 Releases 下载最新版本](https://github.com/9364953w-dotcom/image-compressor/releases/latest)
-- [macOS 版（ZIP）](https://github.com/9364953w-dotcom/image-compressor/releases/latest/download/ImageCompressor-macOS.zip)
+- [macOS 版（Apple 芯片 M1/M2/M3）](https://github.com/9364953w-dotcom/image-compressor/releases/latest/download/ImageCompressor-macOS-arm64.zip)
+- [macOS 版（Intel 芯片）](https://github.com/9364953w-dotcom/image-compressor/releases/latest/download/ImageCompressor-macOS-x64.zip)
 - [Windows 版（ZIP）](https://github.com/9364953w-dotcom/image-compressor/releases/latest/download/ImageCompressor-Windows.zip)
 
 ## 🖼️ 程序界面截图
