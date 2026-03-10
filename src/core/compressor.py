@@ -7,6 +7,7 @@ import logging
 import os
 import shutil
 import tempfile
+import threading
 from pathlib import Path
 from typing import Tuple, Literal, Optional, Dict, Any
 
@@ -31,6 +32,9 @@ except ImportError:
     pass
 
 logger = logging.getLogger(__name__)
+
+# 用于 backup_set/_manifest.json 的并发写保护（同进程多线程）
+_MANIFEST_LOCK = threading.Lock()
 
 # 状态类型定义
 CompressStatus = Literal["processed", "skipped", "too_small", "failed", "cached"]
@@ -338,7 +342,7 @@ def compress_image(
                     rel_path = rel_path.with_suffix(output_ext)
             
             dst_path = output_root / rel_path
-        
+
         if not overwrite and dst_path.exists():
             existing_size = dst_path.stat().st_size
             return src_path, "skipped", orig_size, existing_size, details
@@ -369,10 +373,12 @@ def compress_image(
                 try:
                     from PIL import ExifTags
                     orientation = None
-                    for tag, value in img._getexif().items():
-                        if ExifTags.TAGS.get(tag) == 'Orientation':
-                            orientation = value
-                            break
+                    exif_data = img._getexif()
+                    if exif_data:
+                        for tag, value in exif_data.items():
+                            if ExifTags.TAGS.get(tag) == 'Orientation':
+                                orientation = value
+                                break
                     
                     if orientation:
                         rotate_map = {
@@ -451,17 +457,32 @@ def compress_image(
                     backup_name = f"{file_index:06d}_{src_path.name}"
                     shutil.copy2(str(local_backup), str(backup_set / backup_name))
                     manifest_file = backup_set / "_manifest.json"
-                    manifest = []
-                    if manifest_file.exists():
-                        with open(manifest_file, "r", encoding="utf-8") as mf:
-                            manifest = json.load(mf)
-                    manifest.append({
-                        "backup_name": backup_name,
-                        "original_path": str(src_path),
-                        "new_path": str(dst_path),
-                    })
-                    with open(manifest_file, "w", encoding="utf-8") as mf:
-                        json.dump(manifest, mf, ensure_ascii=False, indent=2)
+                    with _MANIFEST_LOCK:
+                        manifest = []
+                        if manifest_file.exists():
+                            try:
+                                with open(manifest_file, "r", encoding="utf-8") as mf:
+                                    content = mf.read().strip()
+                                    if content:
+                                        manifest = json.loads(content)
+                            except Exception:
+                                # 可能被并发写入打断或文件损坏：回退为空列表继续写入，避免整张图失败
+                                manifest = []
+
+                        manifest.append(
+                            {
+                                "backup_name": backup_name,
+                                "original_path": str(src_path),
+                                "new_path": str(dst_path),
+                            }
+                        )
+                        # 原子写入：写临时文件后 replace，避免部分写入导致 JSONDecodeError
+                        tmp_manifest = manifest_file.with_suffix(".json.tmp")
+                        with open(tmp_manifest, "w", encoding="utf-8") as mf:
+                            json.dump(manifest, mf, ensure_ascii=False, indent=2)
+                            mf.flush()
+                            os.fsync(mf.fileno())
+                        os.replace(tmp_manifest, manifest_file)
 
                 shutil.move(str(temp_path), str(dst_path))
                 local_backup.unlink(missing_ok=True)

@@ -198,7 +198,7 @@ class CompressWorker(QObject):
                 index, _ = future_to_meta[future]
                 try:
                     (src_path, status, orig_size, new_size, details), retry_count = future.result()
-                except Exception:
+                except Exception as exc:
                     src_path = _
                     status = "failed"
                     orig_size = 0
