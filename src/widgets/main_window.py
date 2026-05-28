@@ -722,9 +722,10 @@ class MainWindow(QMainWindow):
         output_dir = self.input_panel.output_edit.text().strip() or None
         overwrite = output_dir is None
 
+        rename_error = self.settings_panel.validate_rename()
+        if rename_error:
+            raise ValueError(rename_error)
         rename_pattern = self.settings_panel.rename_pattern_value()
-        if overwrite and rename_pattern:
-            rename_pattern = None
 
         backup_set = None
         if overwrite:

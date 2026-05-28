@@ -2,6 +2,8 @@
 预览与参数设置面板。
 """
 
+from typing import Optional
+
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
     QAbstractSpinBox,
@@ -20,7 +22,12 @@ from PyQt5.QtWidgets import (
     QLineEdit,
 )
 
-from src.config import DEFAULT_MIN_SIZE_MB, DEFAULT_QUALITY, RENAME_PATTERN_LABELS
+from src.config import (
+    DEFAULT_MIN_SIZE_MB,
+    DEFAULT_QUALITY,
+    DEFAULT_RENAME_INDEX_DIGITS,
+    RENAME_PATTERN_LABELS,
+)
 from src.widgets.compare_slider import CompareSlider
 
 
@@ -157,15 +164,23 @@ class SettingsPanel(QWidget):
         rename_row = QHBoxLayout()
         rename_row.addWidget(QLabel("重命名"))
         self.rename_combo = QComboBox()
-        for label, _pattern in RENAME_PATTERN_LABELS:
+        for label, *_rest in RENAME_PATTERN_LABELS:
             self.rename_combo.addItem(label)
         rename_row.addWidget(self.rename_combo)
-        rename_row.addWidget(QLabel("前缀"))
+        self.rename_prefix_label = QLabel("前缀")
         self.rename_prefix_edit = QLineEdit()
         self.rename_prefix_edit.setPlaceholderText("自定义前缀")
         self.rename_prefix_edit.setMaximumWidth(120)
-        self.rename_prefix_edit.setEnabled(False)
+        rename_row.addWidget(self.rename_prefix_label)
         rename_row.addWidget(self.rename_prefix_edit)
+        self.rename_digits_label = QLabel("序号位数")
+        self.rename_digits_spin = QSpinBox()
+        self.rename_digits_spin.setRange(1, 6)
+        self.rename_digits_spin.setValue(DEFAULT_RENAME_INDEX_DIGITS)
+        self.rename_digits_spin.setButtonSymbols(QAbstractSpinBox.UpDownArrows)
+        self.rename_digits_spin.setToolTip("序号补零位数，如 3 位则输出 001、002…")
+        rename_row.addWidget(self.rename_digits_label)
+        rename_row.addWidget(self.rename_digits_spin)
         rename_row.addStretch()
         settings_layout.addLayout(rename_row)
 
@@ -246,26 +261,45 @@ class SettingsPanel(QWidget):
         self.smart_cb.toggled.connect(lambda checked: self.quality_slider.setEnabled(not checked))
         self.smart_cb.toggled.connect(lambda checked: self.quality_spin.setEnabled(not checked))
         self.rename_combo.currentIndexChanged.connect(self._on_rename_changed)
+        self._on_rename_changed(self.rename_combo.currentIndex())
 
         self._original_pixmap = None
         self._compressed_pixmap = None
 
     def _on_rename_changed(self, index: int) -> None:
-        pattern = RENAME_PATTERN_LABELS[index][1] if index < len(RENAME_PATTERN_LABELS) else "{name}"
-        self.rename_prefix_edit.setEnabled("{prefix}" in pattern)
+        if index < 0 or index >= len(RENAME_PATTERN_LABELS):
+            return
+        _label, _template, needs_prefix, needs_index = RENAME_PATTERN_LABELS[index]
+        self.rename_prefix_label.setVisible(needs_prefix)
+        self.rename_prefix_edit.setVisible(needs_prefix)
+        self.rename_digits_label.setVisible(needs_index)
+        self.rename_digits_spin.setVisible(needs_index)
 
     def rename_pattern_value(self):
         idx = self.rename_combo.currentIndex()
         if idx <= 0:
             return None
-        pattern = RENAME_PATTERN_LABELS[idx][1]
-        if "{prefix}" in pattern:
+        _label, template, needs_prefix, needs_index = RENAME_PATTERN_LABELS[idx]
+        pattern = template
+        if needs_prefix:
             prefix = self.rename_prefix_edit.text().strip()
-            if prefix:
-                pattern = pattern.replace("{prefix}", prefix)
-            else:
+            if not prefix:
                 return None
+            pattern = pattern.replace("{prefix}", prefix)
+        if needs_index:
+            digits = self.rename_digits_spin.value()
+            pattern = pattern.replace("{index}", f"{{index:0{digits}d}}")
         return pattern
+
+    def validate_rename(self) -> Optional[str]:
+        """校验重命名配置，无效时返回错误提示。"""
+        idx = self.rename_combo.currentIndex()
+        if idx <= 0:
+            return None
+        _label, _template, needs_prefix, _needs_index = RENAME_PATTERN_LABELS[idx]
+        if needs_prefix and not self.rename_prefix_edit.text().strip():
+            return "「前缀+序号」模式需要填写自定义前缀"
+        return None
 
     def set_preview_images(self, original_pixmap, compressed_pixmap) -> None:
         self._original_pixmap = original_pixmap

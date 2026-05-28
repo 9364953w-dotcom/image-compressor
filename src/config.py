@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Dict, List, Any
 
 # 版本信息
-__version__ = "1.4.1"
+__version__ = "1.4.2"
 APP_NAME = "图片批量压缩工具"
 BUNDLE_ID = "com.wang.imagecompressor"
 
@@ -52,14 +52,16 @@ BACKUP_DIR_NAME = ".backups"
 MAX_TASK_HISTORY = 50
 MAX_BACKUP_SETS = 5
 
-# 重命名显示名
+# 重命名模式：(显示名, 模板, 是否需要前缀, 是否需要序号)
+# 模板中的 {index} 会在运行时替换为带位数的格式，如 {index:03d}
 RENAME_PATTERN_LABELS = [
-    ("保持原文件名", "{name}"),
-    ("原文件名_序号", "{name}_{index:03d}"),
-    ("纯序号", "{index:03d}"),
-    ("前缀+序号", "{prefix}{index:03d}"),
-    ("日期+序号", "{date}_{index:03d}"),
+    ("保持原文件名", "{name}", False, False),
+    ("原文件名_序号", "{name}_{index}", False, True),
+    ("纯序号", "{index}", False, True),
+    ("前缀+序号", "{prefix}{index}", True, True),
+    ("日期+序号", "{date}_{index}", False, True),
 ]
+DEFAULT_RENAME_INDEX_DIGITS = 3
 DEFAULT_PRESETS = [
     {
         "name": "网页用",
@@ -117,15 +119,6 @@ DEFAULT_PRESETS = [
             "min_size_mb": 0.0,
         }
     },
-]
-
-# 批量重命名配置
-RENAME_PATTERNS = [
-    "{name}",           # 保持原文件名
-    "{name}_{index:03d}",  # 原文件名_序号
-    "{index:03d}",      # 纯序号
-    "{prefix}{index:03d}",  # 自定义前缀+序号
-    "{date}_{index:03d}",  # 日期+序号
 ]
 
 # 资源路径

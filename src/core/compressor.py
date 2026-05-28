@@ -318,29 +318,34 @@ def compress_image(
         
         # 确定输出路径
         format_changed = output_ext != suffix
+        renamed = False
+        new_name = ""
+        if rename_pattern and rename_pattern != "{name}":
+            from datetime import datetime
+            name_without_ext = src_path.stem
+            new_name = rename_pattern.format(
+                name=name_without_ext,
+                index=file_index + 1,
+                prefix="",
+                date=datetime.now().strftime("%Y%m%d"),
+            )
+            renamed = True
+            details["renamed"] = True
+            details["new_name"] = new_name
+
         if overwrite:
-            if format_changed:
+            if renamed:
+                dst_path = src_path.parent / f"{new_name}{output_ext}"
+            elif format_changed:
                 dst_path = src_path.with_suffix(output_ext)
             else:
                 dst_path = src_path
         else:
             rel_path = src_path.relative_to(input_root)
-            if rename_pattern and rename_pattern != "{name}":
-                from datetime import datetime
-                name_without_ext = src_path.stem
-                new_name = rename_pattern.format(
-                    name=name_without_ext,
-                    index=file_index + 1,
-                    prefix="",
-                    date=datetime.now().strftime("%Y%m%d"),
-                )
+            if renamed:
                 rel_path = rel_path.parent / f"{new_name}{output_ext}"
-                details["renamed"] = True
-                details["new_name"] = new_name
-            else:
-                if format_changed:
-                    rel_path = rel_path.with_suffix(output_ext)
-            
+            elif format_changed:
+                rel_path = rel_path.with_suffix(output_ext)
             dst_path = output_root / rel_path
 
         if not overwrite and dst_path.exists():
@@ -486,7 +491,7 @@ def compress_image(
 
                 shutil.move(str(temp_path), str(dst_path))
                 local_backup.unlink(missing_ok=True)
-                if format_changed and src_path.exists() and src_path != dst_path:
+                if src_path.exists() and src_path != dst_path:
                     src_path.unlink()
             except Exception as e:
                 if local_backup.exists():
