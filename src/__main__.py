@@ -12,12 +12,21 @@ from datetime import datetime
 from pathlib import Path
 
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QColor
 from PyQt5.QtWidgets import QApplication, QMessageBox, QStyleFactory
 
 from src.config import APP_NAME
+from src.widgets.splash_screen import create_splash_screen
+
+_SPLASH_MESSAGE_COLOR = QColor("#8b8b9b")
 
 
 STARTUP_LOG = Path.home() / ".image-compressor" / "startup_error.log"
+
+
+def _update_splash(splash, app, message: str) -> None:
+    splash.showMessage(message, Qt.AlignBottom | Qt.AlignHCenter, _SPLASH_MESSAGE_COLOR)
+    app.processEvents()
 
 
 def _append_startup_log(stage: str, exc: BaseException) -> None:
@@ -54,11 +63,21 @@ def main():
 
         sys.excepthook = _handle_exception
 
+        splash = create_splash_screen(app)
+        splash.show()
+        app.processEvents()
+
         try:
+            _update_splash(splash, app, "正在加载组件...")
             from src.widgets import MainWindow
+
+            _update_splash(splash, app, "正在初始化界面...")
             window = MainWindow()
             window.show()
+            splash.finish(window)
+            app.processEvents()
         except Exception as exc:
+            splash.close()
             _append_startup_log("startup", exc)
             QMessageBox.critical(
                 None,
