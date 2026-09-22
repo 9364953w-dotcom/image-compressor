@@ -12,6 +12,21 @@ from PyQt5.QtGui import QDragEnterEvent, QDropEvent
 from src.config import IMAGE_EXTENSIONS
 
 
+def path_from_mime(mime) -> str:
+    """从拖放数据取出文件夹路径；单张图片则取其父目录。"""
+    if mime is None or not mime.hasUrls():
+        return ""
+    for url in mime.urls():
+        if not url.isLocalFile():
+            continue
+        path = Path(url.toLocalFile())
+        if path.is_dir():
+            return str(path)
+        if path.is_file() and path.suffix.lower() in IMAGE_EXTENSIONS:
+            return str(path.parent)
+    return ""
+
+
 class DragDropLineEdit(QLineEdit):
     """支持拖拽文件夹的输入框。"""
 
@@ -41,9 +56,10 @@ class DragDropLineEdit(QLineEdit):
 
 
 class DragDropListWidget(QListWidget):
-    """支持拖拽图片文件和文件夹的列表。"""
+    """支持拖拽图片文件和文件夹的列表。文件夹只回传路径，不在 UI 线程扫描。"""
 
     files_dropped = pyqtSignal(list)
+    folder_dropped = pyqtSignal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -62,18 +78,19 @@ class DragDropListWidget(QListWidget):
             event.ignore()
 
     def dropEvent(self, event: QDropEvent) -> None:
-        paths: List[Path] = []
+        folders: List[Path] = []
+        files: List[Path] = []
         for url in event.mimeData().urls():
             if not url.isLocalFile():
                 continue
-            p = Path(url.toLocalFile())
-            if p.is_file() and p.suffix.lower() in IMAGE_EXTENSIONS:
-                paths.append(p)
-            elif p.is_dir():
-                paths.extend(
-                    f for f in sorted(p.rglob("*"))
-                    if f.is_file() and f.suffix.lower() in IMAGE_EXTENSIONS
-                )
-        if paths:
-            self.files_dropped.emit(paths)
+            path = Path(url.toLocalFile())
+            if path.is_dir():
+                folders.append(path)
+            elif path.is_file() and path.suffix.lower() in IMAGE_EXTENSIONS:
+                files.append(path)
+        if folders:
+            self.folder_dropped.emit(str(folders[0]))
+        elif files:
+            self.folder_dropped.emit(str(files[0].parent))
+            self.files_dropped.emit(files)
         event.acceptProposedAction()

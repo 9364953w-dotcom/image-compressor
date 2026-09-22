@@ -61,7 +61,7 @@ class AboutDialog(QDialog):
             ("运行环境", f"Python {platform.python_version()} / Qt {QT_VERSION_STR}"),
             ("系统平台", f"{platform.system()} {platform.release()} ({platform.machine()})"),
             ("专用标识", "成都一禾视觉专用"),
-            ("技术栈", "PyQt5, Pillow"),
+            ("技术栈", "PyQt5, Pillow, mozjpeg, oxipng"),
         ]
 
         for idx, (k, v) in enumerate(rows):
@@ -89,6 +89,10 @@ class AboutDialog(QDialog):
         )
         link.setOpenExternalLinks(True)
         support_layout.addWidget(link)
+        credit = QLabel("JPEG 编码致谢 mozjpeg，PNG 优化致谢 oxipng。")
+        credit.setObjectName("muted")
+        credit.setWordWrap(True)
+        support_layout.addWidget(credit)
         root.addWidget(support_card)
 
         root.addStretch()

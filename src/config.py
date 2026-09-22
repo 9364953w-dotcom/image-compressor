@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Dict, List, Any
 
 # 版本信息
-__version__ = "1.4.2"
+__version__ = "1.6.0"
 APP_NAME = "图片批量压缩工具"
 BUNDLE_ID = "com.wang.imagecompressor"
 
@@ -20,7 +20,7 @@ OUTPUT_FORMATS = ['original', 'jpg', 'png', 'webp', 'avif', 'heif']
 DEFAULT_QUALITY = 90
 DEFAULT_MIN_SIZE_MB = 0.1
 DEFAULT_COMPRESS_LEVEL_PNG = 6
-DEFAULT_WEBP_METHOD = 6
+DEFAULT_WEBP_METHOD = 4
 
 # 尺寸调整默认值
 DEFAULT_MAX_WIDTH = 0  # 0 表示不限制

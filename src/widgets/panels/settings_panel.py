@@ -1,5 +1,5 @@
 """
-预览与参数设置面板。
+压缩参数设置面板。
 """
 
 from typing import Optional
@@ -18,7 +18,6 @@ from PyQt5.QtWidgets import (
     QSlider,
     QSpinBox,
     QCheckBox,
-    QScrollArea,
     QLineEdit,
 )
 
@@ -28,11 +27,10 @@ from src.config import (
     DEFAULT_RENAME_INDEX_DIGITS,
     RENAME_PATTERN_LABELS,
 )
-from src.widgets.compare_slider import CompareSlider
 
 
 class SettingsPanel(QWidget):
-    """核心压缩参数与预览入口。"""
+    """核心压缩参数。"""
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -56,26 +54,12 @@ class SettingsPanel(QWidget):
         self.preset_desc_label.setObjectName("subtle")
         top_layout.addWidget(self.preset_desc_label)
 
-        preview_row = QHBoxLayout()
+        extra_row = QHBoxLayout()
         self.exif_btn = QPushButton("查看 EXIF")
         self.exif_btn.setToolTip("查看选中图片的 EXIF 信息")
-        preview_row.addWidget(self.exif_btn)
-        preview_row.addStretch()
-        top_layout.addLayout(preview_row)
-
-        self.preview_notice_label = QLabel("预览为临时计算，不会覆盖源文件。")
-        self.preview_notice_label.setObjectName("subtle")
-        top_layout.addWidget(self.preview_notice_label)
-
-        preview_info_row = QHBoxLayout()
-        self.preview_original_label = QLabel("原始: -")
-        self.preview_compressed_label = QLabel("压缩后: -")
-        self.preview_savings_label = QLabel("节省: -")
-        preview_info_row.addWidget(self.preview_original_label)
-        preview_info_row.addWidget(self.preview_compressed_label)
-        preview_info_row.addWidget(self.preview_savings_label)
-        preview_info_row.addStretch()
-        top_layout.addLayout(preview_info_row)
+        extra_row.addWidget(self.exif_btn)
+        extra_row.addStretch()
+        top_layout.addLayout(extra_row)
         root.addWidget(top_group)
 
         settings_group = QGroupBox("压缩参数")
@@ -148,10 +132,11 @@ class SettingsPanel(QWidget):
 
         row5 = QHBoxLayout()
         self.include_subfolders_cb = QCheckBox("包含子文件夹")
+        self.include_subfolders_cb.setChecked(True)
         self.incremental_cb = QCheckBox("跳过已处理文件")
         self.incremental_cb.setChecked(True)
         self.keep_exif_cb = QCheckBox("保留 EXIF")
-        self.keep_exif_cb.setChecked(True)
+        self.keep_exif_cb.setChecked(False)
         self.auto_rotate_cb = QCheckBox("自动旋转")
         self.auto_rotate_cb.setChecked(True)
         row5.addWidget(self.include_subfolders_cb)
@@ -196,32 +181,7 @@ class SettingsPanel(QWidget):
         settings_layout.addLayout(adv_row)
 
         root.addWidget(settings_group, 0)
-
-        preview_group = QGroupBox("实时预览（左原图 / 右压缩后 · 拖动滑块对比 · 滚轮缩放 · 双击切换100%）")
-        preview_layout = QVBoxLayout(preview_group)
-        preview_layout.setSpacing(6)
-
-        preview_toolbar = QHBoxLayout()
-        self.live_preview_cb = QCheckBox("实时预览")
-        self.live_preview_cb.setChecked(True)
-        preview_toolbar.addWidget(self.live_preview_cb)
-        preview_toolbar.addSpacing(12)
-        self.zoom_fit_btn = QPushButton("适应窗口")
-        self.zoom_fit_btn.setFixedWidth(72)
-        self.zoom_100_btn = QPushButton("100%")
-        self.zoom_100_btn.setFixedWidth(52)
-        preview_toolbar.addWidget(self.zoom_fit_btn)
-        preview_toolbar.addWidget(self.zoom_100_btn)
-        preview_toolbar.addStretch()
-        preview_layout.addLayout(preview_toolbar)
-
-        self.compare_slider = CompareSlider()
-        self.compare_slider.setMinimumHeight(120)
-        self.zoom_fit_btn.clicked.connect(self.compare_slider.zoom_fit)
-        self.zoom_100_btn.clicked.connect(self.compare_slider.zoom_100)
-        preview_layout.addWidget(self.compare_slider, 1)
-
-        root.addWidget(preview_group, 1)
+        root.addStretch(1)
 
         action_group = QGroupBox("任务操作")
         action_layout = QHBoxLayout(action_group)
@@ -237,7 +197,7 @@ class SettingsPanel(QWidget):
         self.start_btn.setMinimumHeight(38)
         self.start_btn.setMinimumWidth(120)
         self.pause_btn = QPushButton("暂停")
-        self.pause_btn.setToolTip("暂停/继续当前任务")
+        self.pause_btn.setToolTip("暂停领取新任务，进行中的文件仍会完成")
         self.pause_btn.setMinimumHeight(38)
         self.pause_btn.setEnabled(False)
         self.cancel_btn = QPushButton("取消")
@@ -262,9 +222,6 @@ class SettingsPanel(QWidget):
         self.smart_cb.toggled.connect(lambda checked: self.quality_spin.setEnabled(not checked))
         self.rename_combo.currentIndexChanged.connect(self._on_rename_changed)
         self._on_rename_changed(self.rename_combo.currentIndex())
-
-        self._original_pixmap = None
-        self._compressed_pixmap = None
 
     def _on_rename_changed(self, index: int) -> None:
         if index < 0 or index >= len(RENAME_PATTERN_LABELS):
@@ -300,20 +257,6 @@ class SettingsPanel(QWidget):
         if needs_prefix and not self.rename_prefix_edit.text().strip():
             return "「前缀+序号」模式需要填写自定义前缀"
         return None
-
-    def set_preview_images(self, original_pixmap, compressed_pixmap) -> None:
-        self._original_pixmap = original_pixmap
-        self._compressed_pixmap = compressed_pixmap
-        self.compare_slider.set_images(original_pixmap, compressed_pixmap)
-
-    def clear_preview(self, message: str) -> None:
-        self._original_pixmap = None
-        self._compressed_pixmap = None
-        self.compare_slider.clear(message)
-
-    def refresh_preview_widget(self) -> None:
-        if self._original_pixmap and self._compressed_pixmap:
-            self.compare_slider.set_images(self._original_pixmap, self._compressed_pixmap)
 
     def output_format_value(self) -> str:
         return ["original", "jpg", "png", "webp", "avif", "heif"][self.format_combo.currentIndex()]

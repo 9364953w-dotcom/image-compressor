@@ -5,20 +5,18 @@
 import csv
 import subprocess
 import sys
-from io import BytesIO
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List
 
-from PIL import Image, ImageOps
-from PyQt5.QtCore import QThread, Qt, QTimer, QUrl
-from PyQt5.QtGui import QImage, QPixmap, QDesktopServices
+from PIL import Image
+from PyQt5.QtCore import QThread, Qt, QTimer, QUrl, pyqtSignal
+from PyQt5.QtGui import QDesktopServices
 from PyQt5.QtGui import QKeySequence
 from PyQt5.QtWidgets import (
     QAction,
     QActionGroup,
     QApplication,
-    QComboBox,
     QFileDialog,
     QLabel,
     QMainWindow,
@@ -33,15 +31,16 @@ from PyQt5.QtWidgets import (
     QListWidgetItem,
 )
 
-from src.config import APP_NAME, IMAGE_EXTENSIONS, RENAME_PATTERN_LABELS, __version__, config_manager
+from src.config import APP_NAME, IMAGE_EXTENSIONS, __version__, config_manager
 from src.core.compressor import get_exif_info
 from src.core.worker import CompressWorker
 from src.utils import format_bytes, setup_logging
 from src.widgets.about_dialog import AboutDialog
 from src.widgets.exif_dialog import ExifDialog
+from src.widgets.file_scanner import FileScanController
 from src.widgets.history_dialog import HistoryDialog
 from src.widgets.panels import InputPanel, LogPanel, SettingsPanel, StatsPanel
-from src.widgets.theme import THEMES, build_stylesheet, build_palette_from_tokens
+from src.widgets.theme import DEFAULT_THEME, build_stylesheet, build_palette_from_tokens
 
 
 STATUS_TEXT = {
@@ -61,6 +60,12 @@ STATUS_TEXT = {
 class MainWindow(QMainWindow):
     """图片压缩工具主窗口。"""
 
+    job_progress = pyqtSignal(dict)
+    job_finished = pyqtSignal(dict)
+    job_state = pyqtSignal(str, dict)
+    input_staged = pyqtSignal(str)
+    file_count_ready = pyqtSignal(int)
+
     def __init__(self):
         super().__init__()
 
@@ -70,19 +75,18 @@ class MainWindow(QMainWindow):
         self.worker = None
         self.thread = None
         self.current_detailed_stats: List[Dict] = []
-        self.current_theme_name = "HumanityDark"
         self.current_view_name = "Simple"
         self._image_files: List[Path] = []
         self._selected_image_path: Path = None
-        self._preview_timer = QTimer(self)
-        self._preview_timer.setSingleShot(True)
-        self._preview_timer.timeout.connect(self._refresh_live_preview)
         self._task_queue: List[dict] = []
         self._last_worker_args = None
+        self._scan_generation = 0
+        self._file_scanner = FileScanController(self)
+        self._file_scanner.finished.connect(self._on_scan_finished)
 
         self.setWindowTitle(f"{APP_NAME} v{__version__}")
-        self.setMinimumSize(1280, 820)
-        self.resize(1480, 920)
+        self.setMinimumSize(960, 640)
+        self.resize(1100, 720)
 
         self._setup_ui()
         self._connect_signals()
@@ -96,14 +100,7 @@ class MainWindow(QMainWindow):
         self._setup_menu_and_toolbars()
         self._setup_layout()
         self._setup_status_bar()
-        self._apply_theme(self.current_theme_name)
-
-    @staticmethod
-    def _pil_to_qpixmap(image: Image.Image) -> QPixmap:
-        rgba = image.convert("RGBA")
-        data = rgba.tobytes("raw", "RGBA")
-        qimage = QImage(data, rgba.width, rgba.height, rgba.width * 4, QImage.Format_RGBA8888)
-        return QPixmap.fromImage(qimage.copy())
+        self._apply_theme()
 
     def _setup_menu_and_toolbars(self) -> None:
         menu = self.menuBar()
@@ -129,18 +126,6 @@ class MainWindow(QMainWindow):
         view_menu.addAction(self.simple_view_action)
         view_menu.addAction(self.advanced_view_action)
 
-        theme_menu = menu.addMenu("主题")
-        theme_group = QActionGroup(self)
-        theme_group.setExclusive(True)
-        self.theme_actions = {}
-        for theme_name in THEMES:
-            action = QAction(theme_name, self)
-            action.setCheckable(True)
-            action.triggered.connect(lambda _, t=theme_name: self._apply_theme(t))
-            theme_group.addAction(action)
-            self.theme_actions[theme_name] = action
-            theme_menu.addAction(action)
-
         help_menu = menu.addMenu("帮助")
         history_action = QAction("历史任务", self)
         history_action.triggered.connect(self._show_task_history)
@@ -153,15 +138,6 @@ class MainWindow(QMainWindow):
         self.context_toolbar = QToolBar("上下文栏", self)
         self.context_toolbar.setMovable(False)
         self.addToolBar(Qt.TopToolBarArea, self.context_toolbar)
-
-        theme_label = QLabel(" 主题: ")
-        self.context_toolbar.addWidget(theme_label)
-        self.theme_combo = QComboBox()
-        self.theme_combo.setMinimumWidth(130)
-        self.theme_combo.addItems(list(THEMES.keys()))
-        self.theme_combo.currentTextChanged.connect(self._apply_theme)
-        self.context_toolbar.addWidget(self.theme_combo)
-        self.context_toolbar.addSeparator()
 
         self.badge_files = QLabel("  文件: 0  ")
         self.badge_files.setObjectName("badge")
@@ -208,8 +184,8 @@ class MainWindow(QMainWindow):
         container_layout.setSpacing(6)
         container_layout.addWidget(self.vertical_splitter)
         self.setCentralWidget(container)
-        self.main_splitter.setSizes([300, 590, 590])
-        self.vertical_splitter.setSizes([760, 160])
+        self.main_splitter.setSizes([280, 400, 420])
+        self.vertical_splitter.setSizes([560, 120])
 
     def _setup_status_bar(self) -> None:
         self.status_bar = QStatusBar(self)
@@ -225,7 +201,7 @@ class MainWindow(QMainWindow):
         self.input_panel.input_edit.textChanged.connect(self._refresh_file_list)
         self.input_panel.history_combo.currentTextChanged.connect(self._on_history_selected)
         self.input_panel.file_list.currentItemChanged.connect(self._on_file_selected)
-        self.input_panel.file_list.files_dropped.connect(self._on_files_dropped)
+        self.input_panel.file_list.folder_dropped.connect(self.stage_input)
         self.input_panel.enqueue_btn.clicked.connect(self._enqueue_task)
         self.input_panel.clear_queue_btn.clicked.connect(self._clear_queue)
 
@@ -243,42 +219,14 @@ class MainWindow(QMainWindow):
 
         self.stats_panel.export_btn.clicked.connect(self._export_stats)
 
-        for signal in (
-            self.settings_panel.format_combo.currentIndexChanged,
-            self.settings_panel.min_size_spin.valueChanged,
-            self.settings_panel.quality_spin.valueChanged,
-            self.settings_panel.resize_cb.toggled,
-            self.settings_panel.keep_ratio_cb.toggled,
-            self.settings_panel.max_width_spin.valueChanged,
-            self.settings_panel.max_height_spin.valueChanged,
-            self.settings_panel.smart_cb.toggled,
-            self.settings_panel.target_size_spin.valueChanged,
-            self.settings_panel.keep_exif_cb.toggled,
-            self.settings_panel.auto_rotate_cb.toggled,
-        ):
-            signal.connect(self._schedule_live_preview)
-
-        self.settings_panel.live_preview_cb.toggled.connect(self._schedule_live_preview)
-
     # ========== Theme / View ==========
 
-    def _apply_theme(self, theme_name: str) -> None:
-        if theme_name not in THEMES:
-            return
-        self.current_theme_name = theme_name
-        tokens = THEMES[theme_name]
-
-        QApplication.instance().setPalette(build_palette_from_tokens(tokens))
+    def _apply_theme(self) -> None:
+        tokens = DEFAULT_THEME
+        app = QApplication.instance()
+        if app is not None:
+            app.setPalette(build_palette_from_tokens(tokens))
         self.setStyleSheet(build_stylesheet(tokens))
-
-        self.theme_combo.blockSignals(True)
-        self.theme_combo.setCurrentText(theme_name)
-        self.theme_combo.blockSignals(False)
-
-        for name, action in self.theme_actions.items():
-            action.setChecked(name == theme_name)
-
-        self._save_ui_settings()
 
     def _apply_view(self, view_name: str) -> None:
         self.current_view_name = view_name
@@ -298,26 +246,77 @@ class MainWindow(QMainWindow):
             self,
             "快速开始",
             "欢迎使用图片压缩工具。\n\n"
-            "1. 先选择输入文件夹（也可直接拖入图片）\n"
-            "2. 选择一个预设（可选）\n"
-            "3. 点击「开始压缩」\n\n"
-            "提示：可以切换简洁/高级视图与主题。",
+            "从 Finder 把文件夹拖到屏幕顶部菜单栏附近即可压缩。\n"
+            "需要改参数时，再打开主窗口。",
         )
         settings["tutorial_seen"] = True
         config_manager.save_ui_settings(settings)
 
     def _load_ui_settings(self) -> None:
         settings = config_manager.load_ui_settings()
-        theme_name = settings.get("theme", "HumanityDark")
         view_name = settings.get("view", "Simple")
-        self._apply_theme(theme_name)
         self._apply_view(view_name)
 
     def _save_ui_settings(self) -> None:
         settings = config_manager.load_ui_settings()
-        settings["theme"] = self.current_theme_name
         settings["view"] = self.current_view_name
         config_manager.save_ui_settings(settings)
+
+    @property
+    def is_running(self) -> bool:
+        return self._is_running
+
+    @property
+    def drop_auto_start(self) -> bool:
+        return bool(config_manager.load_ui_settings().get("drop_auto_start", False))
+
+    def set_drop_auto_start(self, enabled: bool) -> None:
+        settings = config_manager.load_ui_settings()
+        settings["drop_auto_start"] = bool(enabled)
+        config_manager.save_ui_settings(settings)
+
+    def should_show_on_startup(self) -> bool:
+        settings = config_manager.load_ui_settings()
+        if not settings.get("tutorial_seen"):
+            return True
+        return bool(settings.get("show_main_on_startup", True))
+
+    def show_from_tray(self) -> None:
+        settings = config_manager.load_ui_settings()
+        settings["show_main_on_startup"] = True
+        config_manager.save_ui_settings(settings)
+        self.show()
+        self.raise_()
+        self.activateWindow()
+
+    def is_overwrite(self) -> bool:
+        return not self.input_panel.output_edit.text().strip()
+
+    def settings_summary(self) -> str:
+        fmt = self.settings_panel.output_format_value()
+        fmt_text = "原格式" if fmt == "original" else fmt.upper()
+        mode = "覆盖" if self.is_overwrite() else "输出到指定目录"
+        return f"质量 {self.settings_panel.quality_spin.value()}% · {fmt_text} · {mode}"
+
+    def stage_input(self, path: str) -> None:
+        target = Path(path)
+        if target.is_file():
+            target = target.parent
+        if not target.exists():
+            return
+        text = str(target)
+        if self.input_panel.input_edit.text().strip() == text:
+            self._refresh_file_list()
+        else:
+            self.input_panel.input_edit.setText(text)
+        self.input_staged.emit(text)
+
+    def closeEvent(self, event) -> None:
+        settings = config_manager.load_ui_settings()
+        settings["show_main_on_startup"] = False
+        config_manager.save_ui_settings(settings)
+        self.hide()
+        event.ignore()
 
     # ========== History / Presets ==========
 
@@ -404,15 +403,25 @@ class MainWindow(QMainWindow):
         if not input_path or not Path(input_path).exists():
             self.input_panel.file_info_label.setText("0 个文件")
             self.badge_files.setText("文件: 0")
-            self.settings_panel.clear_preview("请选择输入目录后查看预览")
+            self.file_count_ready.emit(0)
             return
 
-        path = Path(input_path)
-        files = path.rglob("*") if self.settings_panel.include_subfolders_cb.isChecked() else path.glob("*")
-        image_files = [f for f in files if f.is_file() and f.suffix.lower() in IMAGE_EXTENSIONS]
-        self._image_files = sorted(image_files)
-        self._populate_file_list(path)
-        self._schedule_live_preview()
+        self._scan_generation += 1
+        self.input_panel.file_info_label.setText("扫描中…")
+        self.badge_files.setText("文件: …")
+        self._file_scanner.start(
+            input_path,
+            self.settings_panel.include_subfolders_cb.isChecked(),
+            self._scan_generation,
+        )
+
+    def _on_scan_finished(self, generation: int, files) -> None:
+        if generation != self._scan_generation:
+            return
+        self._image_files = list(files)
+        input_path = self.input_panel.input_edit.text().strip()
+        self._populate_file_list(Path(input_path) if input_path else None)
+        self.file_count_ready.emit(len(self._image_files))
 
     def _populate_file_list(self, base_path=None) -> None:
         self.input_panel.file_list.clear()
@@ -442,16 +451,6 @@ class MainWindow(QMainWindow):
                 selected = Path(item_path)
                 if selected.exists() and selected.is_file():
                     self._selected_image_path = selected
-        self._schedule_live_preview()
-
-    def _on_files_dropped(self, paths: list) -> None:
-        existing = {str(f) for f in self._image_files}
-        new_files = [p for p in paths if str(p) not in existing]
-        if not new_files:
-            return
-        self._image_files.extend(new_files)
-        self._populate_file_list()
-        self.log_panel.append(f"拖入了 {len(new_files)} 个文件")
 
     # ========== Context Menu ==========
 
@@ -462,7 +461,6 @@ class MainWindow(QMainWindow):
         file_path = Path(item.data(Qt.UserRole))
 
         menu = QMenu(self)
-        preview_action = menu.addAction("预览此图片")
         exif_action = menu.addAction("查看 EXIF")
         menu.addSeparator()
         finder_action = menu.addAction("在 Finder 中显示")
@@ -470,10 +468,7 @@ class MainWindow(QMainWindow):
         remove_action = menu.addAction("从列表移除")
 
         chosen = menu.exec_(self.input_panel.file_list.viewport().mapToGlobal(pos))
-        if chosen == preview_action:
-            self._selected_image_path = file_path
-            self._refresh_live_preview(show_errors=True)
-        elif chosen == exif_action:
+        if chosen == exif_action:
             self._selected_image_path = file_path
             self._show_exif()
         elif chosen == finder_action:
@@ -540,12 +535,10 @@ class MainWindow(QMainWindow):
     # ========== Dialogs ==========
 
     def _show_about(self) -> None:
-        tokens = THEMES.get(self.current_theme_name)
-        AboutDialog(tokens, self).exec_()
+        AboutDialog(DEFAULT_THEME, self).exec_()
 
     def _show_task_history(self) -> None:
-        tokens = THEMES.get(self.current_theme_name)
-        dlg = HistoryDialog(tokens, self)
+        dlg = HistoryDialog(DEFAULT_THEME, self)
         dlg.exec_()
         if dlg.selected_settings:
             self._apply_settings_dict(dlg.selected_settings)
@@ -616,102 +609,9 @@ class MainWindow(QMainWindow):
                 "dimensions": dimensions,
                 "mode": mode,
             }
-            tokens = THEMES.get(self.current_theme_name)
-            ExifDialog(exif_raw, image_info, tokens, self).exec_()
+            ExifDialog(exif_raw, image_info, DEFAULT_THEME, self).exec_()
         except ValueError as exc:
             QMessageBox.warning(self, "提示", str(exc))
-
-    # ========== Preview ==========
-
-    def _schedule_live_preview(self, *_args) -> None:
-        if not self.settings_panel.live_preview_cb.isChecked():
-            return
-        self._preview_timer.start(120)
-
-    def _refresh_live_preview(self, show_errors: bool = False) -> None:
-        try:
-            sample = self._collect_sample_image()
-        except ValueError as exc:
-            self.settings_panel.clear_preview(str(exc))
-            if show_errors:
-                QMessageBox.warning(self, "提示", str(exc))
-            return
-
-        try:
-            with Image.open(sample) as img:
-                if self.settings_panel.auto_rotate_cb.isChecked():
-                    img = ImageOps.exif_transpose(img)
-
-                original_img = img.copy()
-                original_bytes = sample.stat().st_size
-
-                work_img = img.copy()
-                if self.settings_panel.resize_cb.isChecked():
-                    max_w = self.settings_panel.max_width_spin.value()
-                    max_h = self.settings_panel.max_height_spin.value()
-                    ow, oh = work_img.size
-                    ratio = 1.0
-                    if max_w > 0 and ow > max_w:
-                        ratio = min(ratio, max_w / ow)
-                    if max_h > 0 and oh > max_h:
-                        ratio = min(ratio, max_h / oh)
-                    if ratio < 1.0:
-                        nw, nh = max(1, int(ow * ratio)), max(1, int(oh * ratio))
-                        work_img = work_img.resize((nw, nh), Image.Resampling.LANCZOS)
-
-                output_fmt = self.settings_panel.output_format_value()
-                if output_fmt == "original":
-                    output_fmt = sample.suffix.lstrip(".").lower()
-                if output_fmt == "jpg":
-                    output_fmt = "jpeg"
-
-                save_img = work_img.copy()
-                save_kwargs = {}
-                if output_fmt in ("jpeg", "webp", "avif", "heif"):
-                    save_kwargs["quality"] = self.settings_panel.quality_spin.value()
-                if output_fmt == "jpeg":
-                    if save_img.mode != "RGB":
-                        save_img = save_img.convert("RGB")
-                    fmt_name = "JPEG"
-                elif output_fmt == "png":
-                    fmt_name = "PNG"
-                elif output_fmt == "webp":
-                    fmt_name = "WEBP"
-                    if save_img.mode not in ("RGB", "RGBA"):
-                        save_img = save_img.convert("RGB")
-                elif output_fmt == "avif":
-                    fmt_name = "AVIF"
-                    if save_img.mode not in ("RGB", "RGBA"):
-                        save_img = save_img.convert("RGB")
-                elif output_fmt in ("heif", "heic"):
-                    fmt_name = "HEIF"
-                    if save_img.mode not in ("RGB", "RGBA"):
-                        save_img = save_img.convert("RGB")
-                else:
-                    fmt_name = "JPEG"
-                    if save_img.mode != "RGB":
-                        save_img = save_img.convert("RGB")
-
-                buf = BytesIO()
-                save_img.save(buf, format=fmt_name, **save_kwargs)
-                comp_bytes_data = buf.getvalue()
-                compressed_bytes = len(comp_bytes_data)
-                compressed_img = Image.open(BytesIO(comp_bytes_data)).convert("RGBA")
-
-                original_pix = self._pil_to_qpixmap(original_img)
-                compressed_pix = self._pil_to_qpixmap(compressed_img)
-                self.settings_panel.set_preview_images(original_pix, compressed_pix)
-
-                ratio = (original_bytes - compressed_bytes) / original_bytes * 100 if original_bytes > 0 else 0
-                self.settings_panel.preview_original_label.setText(f"原始: {format_bytes(original_bytes)}")
-                self.settings_panel.preview_compressed_label.setText(f"压缩后: {format_bytes(compressed_bytes)}")
-                self.settings_panel.preview_savings_label.setText(f"节省: {ratio:.1f}%")
-                if show_errors:
-                    self.log_panel.append(f"预览完成: {sample.name}")
-        except Exception as exc:
-            self.settings_panel.clear_preview("预览生成失败")
-            if show_errors:
-                QMessageBox.critical(self, "错误", f"预览失败: {exc}")
 
     # ========== Compression ==========
 
@@ -775,16 +675,25 @@ class MainWindow(QMainWindow):
 
         self._run_worker(worker_args, "开始格式转换任务")
 
+    def start_compression(self) -> None:
+        QTimer.singleShot(0, self._start_compression)
+
+    def _warn(self, message: str) -> None:
+        parent = self if self.isVisible() else None
+        QMessageBox.warning(parent, "提示", message)
+
     def _start_compression(self) -> None:
         if self._is_running:
             return
         try:
             worker_args = self._collect_worker_args()
+            self._run_worker(worker_args, "开始压缩任务")
         except ValueError as exc:
-            QMessageBox.warning(self, "提示", str(exc))
-            return
-
-        self._run_worker(worker_args, "开始压缩任务")
+            self._warn(str(exc))
+        except Exception as exc:
+            self.logger.exception("启动压缩失败")
+            self._is_running = False
+            self._warn(f"启动压缩失败：{exc}")
 
     def _run_worker(self, worker_args: dict, log_message: str) -> None:
         self._is_running = True
@@ -827,10 +736,22 @@ class MainWindow(QMainWindow):
             self._is_paused = True
             self.settings_panel.pause_btn.setText("继续")
 
+    def cancel_compression(self) -> None:
+        self._cancel_compression()
+
     def _cancel_compression(self) -> None:
         if self.worker:
             self.worker.cancel()
             self.log_panel.append("收到取消请求，正在停止...")
+
+    def shutdown_jobs(self) -> None:
+        """退出前停掉压缩线程，避免 QThread 在运行中被销毁导致进程 abort。"""
+        self._task_queue.clear()
+        if self.worker:
+            self.worker.cancel()
+        if self.thread:
+            self.thread.quit()
+            self.thread.wait(5000)
 
     def _on_worker_state(self, state: str, payload: dict) -> None:
         self.stats_panel.status_label.setText(STATUS_TEXT.get(state, state))
@@ -838,6 +759,7 @@ class MainWindow(QMainWindow):
         if state == "Running":
             self.badge_threads.setText(f"线程: {payload.get('workers', '-')}")
             self.badge_files.setText(f"文件: {payload.get('total', 0)}")
+        self.job_state.emit(state, payload)
 
     def _on_worker_progress(self, data: dict) -> None:
         percent = int(data.get("percent", 0))
@@ -847,6 +769,7 @@ class MainWindow(QMainWindow):
         eta = int(data.get("eta_seconds", 0.0))
         self.stats_panel.metrics_label.setText(f"速度: {rate:.2f} 张/秒 | ETA: {eta}s")
         self.badge_eta.setText(f"ETA: {eta}s")
+        self.job_progress.emit(data)
 
     def _on_worker_file_completed(self, record: dict) -> None:
         retry = record.get("retry_count", 0)
@@ -905,6 +828,7 @@ class MainWindow(QMainWindow):
 
         if self._task_queue:
             self._process_next_queued()
+        self.job_finished.emit(payload)
 
     def _save_task_record(self, payload: dict) -> None:
         record = {
@@ -933,6 +857,9 @@ class MainWindow(QMainWindow):
         saved = format_bytes(int(payload.get("saved", 0)))
         elapsed = payload.get("elapsed_seconds", 0)
 
+        if not self.isVisible():
+            return
+
         msg = QMessageBox(self)
         msg.setWindowTitle("任务完成")
         msg.setText(f"成功处理 {processed} 个文件，节省 {saved}，耗时 {elapsed:.1f}s")
@@ -943,17 +870,6 @@ class MainWindow(QMainWindow):
 
         if msg.clickedButton() == open_btn and output_dir:
             QDesktopServices.openUrl(QUrl.fromLocalFile(output_dir))
-
-        if sys.platform == "darwin":
-            try:
-                subprocess.run(
-                    ["osascript", "-e",
-                     f'display notification "成功 {processed} 个文件，节省 {saved}" '
-                     f'with title "图片压缩完成"'],
-                    check=False, timeout=3,
-                )
-            except Exception:
-                pass
 
     # ========== Undo ==========
 

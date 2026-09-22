@@ -3,7 +3,7 @@
 import sys
 from pathlib import Path
 
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import QEventLoop, Qt
 from PyQt5.QtGui import QColor, QFont, QFontMetrics, QIcon, QPainter, QPixmap
 from PyQt5.QtWidgets import QApplication, QSplashScreen
 
@@ -13,6 +13,8 @@ _SPLASH_BG = "#1f1f1f"
 _SPLASH_TEXT = "#f2f2f2"
 _SPLASH_MUTED = "#8b8b9b"
 _SPLASH_ACCENT = "#f39c12"
+_SPLASH_WIDTH = 480
+_SPLASH_HEIGHT = 280
 
 
 def _resource_dir() -> Path:
@@ -21,7 +23,7 @@ def _resource_dir() -> Path:
     return Path(__file__).resolve().parent.parent / "resources"
 
 
-def _make_splash_pixmap(width: int = 480, height: int = 280) -> QPixmap:
+def _make_splash_pixmap(width: int, height: int) -> QPixmap:
     pixmap = QPixmap(width, height)
     pixmap.fill(QColor(_SPLASH_BG))
 
@@ -62,10 +64,36 @@ def _make_splash_pixmap(width: int = 480, height: int = 280) -> QPixmap:
 
 
 def create_splash_screen(app: QApplication) -> QSplashScreen:
-    splash = QSplashScreen(_make_splash_pixmap(), Qt.WindowStaysOnTopHint)
+    screen = app.primaryScreen()
+    ratio = screen.devicePixelRatio() if screen else 1.0
+
+    pixmap = _make_splash_pixmap(
+        int(_SPLASH_WIDTH * ratio),
+        int(_SPLASH_HEIGHT * ratio),
+    )
+    pixmap.setDevicePixelRatio(ratio)
+
+    splash = QSplashScreen(pixmap, Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint)
     splash.showMessage(
         "正在启动...",
         Qt.AlignBottom | Qt.AlignHCenter,
         QColor(_SPLASH_MUTED),
     )
+
+    if screen is not None:
+        geo = screen.availableGeometry()
+        splash.move(
+            geo.x() + (geo.width() - _SPLASH_WIDTH) // 2,
+            geo.y() + (geo.height() - _SPLASH_HEIGHT) // 2,
+        )
+
     return splash
+
+
+def present_splash(splash: QSplashScreen, app: QApplication) -> None:
+    """强制启动画面先绘制到屏幕，再进入阻塞式初始化。"""
+    splash.show()
+    splash.raise_()
+    splash.activateWindow()
+    for _ in range(5):
+        app.processEvents(QEventLoop.AllEvents, 50)

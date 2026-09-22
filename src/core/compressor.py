@@ -14,11 +14,11 @@ from typing import Tuple, Literal, Optional, Dict, Any
 from PIL import Image, ImageFile
 
 from src.config import (
-    DEFAULT_COMPRESS_LEVEL_PNG,
-    DEFAULT_WEBP_METHOD,
     IMAGE_EXTENSIONS,
+    SMART_TOLERANCE,
     config_manager,
 )
+from src.core.encoders import save_jpeg, save_png, save_webp
 
 Image.MAX_IMAGE_PIXELS = 300_000_000
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -96,8 +96,9 @@ def smart_compress(
     img: Image.Image,
     dst_path: Path,
     target_size_kb: int,
-    tolerance: float = 0.1,
+    tolerance: float = SMART_TOLERANCE,
     output_format: str = "jpg",
+    keep_exif: bool = False,
 ) -> Tuple[bool, int]:
     """
     智能压缩 - 自动寻找最佳质量参数
@@ -129,9 +130,9 @@ def smart_compress(
             
             # 保存测试
             if output_format in ('jpg', 'jpeg'):
-                _save_jpeg(img, temp_path, quality)
+                _save_jpeg(img, temp_path, quality, keep_exif)
             elif output_format == 'webp':
-                _save_webp(img, temp_path, quality)
+                _save_webp(img, temp_path, quality, keep_exif)
             else:
                 break
             
@@ -246,7 +247,7 @@ def compress_image(
     rename_pattern: Optional[str] = None,
     file_index: int = 0,
     settings_hash: Optional[str] = None,
-    keep_exif: bool = True,
+    keep_exif: bool = False,
     auto_rotate: bool = True,
     backup_set: Optional[Path] = None,
 ) -> Tuple[Path, CompressStatus, int, int, Dict[str, Any]]:
@@ -427,7 +428,8 @@ def compress_image(
             if smart_mode and target_size_kb > 0 and actual_format in ('jpeg', 'webp'):
                 success, new_size = smart_compress(
                     img, actual_save_path, target_size_kb,
-                    output_format=actual_format
+                    output_format=actual_format,
+                    keep_exif=keep_exif,
                 )
                 if not success:
                     if actual_format == 'jpeg':
@@ -522,49 +524,19 @@ def compress_image(
         return src_path, "failed", orig_size, 0, details
 
 
-def _save_jpeg(img: Image.Image, dst_path: Path, quality: int, keep_exif: bool = True) -> None:
-    """保存为 JPEG 格式"""
-    save_kwargs = {
-        "format": "JPEG",
-        "quality": quality,
-        "optimize": True,
-    }
-    
-    if keep_exif:
-        exif = img.info.get('exif')
-        if exif is not None:
-            save_kwargs["exif"] = exif
-    
-    if img.mode != "RGB":
-        img = img.convert("RGB")
-    
-    img.save(dst_path, **save_kwargs)
+def _save_jpeg(img: Image.Image, dst_path: Path, quality: int, keep_exif: bool = False) -> None:
+    """保存为 JPEG。"""
+    save_jpeg(img, dst_path, quality, keep_exif)
 
 
 def _save_png(img: Image.Image, dst_path: Path) -> None:
-    """保存为 PNG 格式，使用优化压缩"""
-    save_kwargs = {
-        "format": "PNG",
-        "optimize": True,
-        "compress_level": DEFAULT_COMPRESS_LEVEL_PNG,
-    }
-    img.save(dst_path, **save_kwargs)
+    """保存为 PNG。"""
+    save_png(img, dst_path)
 
 
-def _save_webp(img: Image.Image, dst_path: Path, quality: int, keep_exif: bool = True) -> None:
+def _save_webp(img: Image.Image, dst_path: Path, quality: int, keep_exif: bool = False) -> None:
     """保存为 WebP 格式"""
-    save_kwargs = {
-        "format": "WEBP",
-        "quality": quality,
-        "method": DEFAULT_WEBP_METHOD,
-    }
-    
-    if keep_exif:
-        exif = img.info.get('exif')
-        if exif is not None:
-            save_kwargs["exif"] = exif
-    
-    img.save(dst_path, **save_kwargs)
+    save_webp(img, dst_path, quality, keep_exif)
 
 
 def _save_avif(img: Image.Image, dst_path: Path, quality: int, keep_exif: bool = True) -> None:

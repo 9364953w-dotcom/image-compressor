@@ -2,17 +2,30 @@
 工作线程模块 - 处理批量压缩任务
 """
 
+import logging
 import os
 import time
 import threading
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from PyQt5.QtCore import QObject, pyqtSignal
 
-from src.config import DYNAMIC_THREADING, IMAGE_EXTENSIONS, MAX_WORKERS
+from src.config import DYNAMIC_THREADING, MAX_WORKERS
 from src.core.compressor import compress_image
+from src.core.scanner import collect_images
+
+logger = logging.getLogger(__name__)
+
+LARGE_FILE_BYTES = 20 * 1024 * 1024
+
+
+def _shutdown_executor(executor: ThreadPoolExecutor) -> None:
+    try:
+        executor.shutdown(wait=False, cancel_futures=True)
+    except TypeError:
+        executor.shutdown(wait=False)
 
 
 class CompressWorker(QObject):
@@ -40,7 +53,7 @@ class CompressWorker(QObject):
         smart_mode: bool = False,
         target_size_kb: int = 0,
         rename_pattern: Optional[str] = None,
-        keep_exif: bool = True,
+        keep_exif: bool = False,
         auto_rotate: bool = True,
         incremental: bool = True,
         max_retries: int = 1,
@@ -75,6 +88,9 @@ class CompressWorker(QObject):
         self._is_canceled = True
         self._pause_event.set()
         self.state_changed.emit("Canceling", {})
+        executor = self._executor
+        if executor is not None:
+            _shutdown_executor(executor)
 
     def pause(self) -> None:
         self._pause_event.clear()
@@ -89,33 +105,62 @@ class CompressWorker(QObject):
         return not self._pause_event.is_set()
 
     def calculate_optimal_workers(self, files: List[Path]) -> int:
-        if not DYNAMIC_THREADING or not files:
-            return MAX_WORKERS or os.cpu_count() or 4
-
         cpu_count = os.cpu_count() or 4
-        total_size = sum(f.stat().st_size for f in files if f.exists())
-        avg_size = total_size / len(files) if files else 0
+        if not DYNAMIC_THREADING or not files:
+            raw = MAX_WORKERS or cpu_count
+            return max(1, min(raw, cpu_count))
 
-        if avg_size > 10 * 1024 * 1024:
-            return max(2, cpu_count // 2)
-        if avg_size > 5 * 1024 * 1024:
-            return max(2, cpu_count - 1)
-        if avg_size < 100 * 1024:
-            return min(cpu_count * 2, 16)
-        return cpu_count
+        sizes = [f.stat().st_size for f in files if f.exists()]
+        if not sizes:
+            return max(1, cpu_count)
+
+        avg_size = sum(sizes) / len(sizes)
+        has_large = any(size > LARGE_FILE_BYTES for size in sizes)
+
+        if avg_size > 40 * 1024 * 1024:
+            workers = max(2, min(4, cpu_count))
+        elif has_large or avg_size > LARGE_FILE_BYTES:
+            workers = max(2, min(cpu_count, 6))
+        else:
+            workers = cpu_count
+
+        if MAX_WORKERS:
+            workers = min(workers, MAX_WORKERS)
+        return max(1, workers)
 
     def _compress_with_retry(self, *args, **kwargs):
+        last_result = None
         last_exc = None
-        for attempt in range(self.max_retries + 1):
+        attempts = self.max_retries + 1
+        for attempt in range(attempts):
             try:
-                return compress_image(*args, **kwargs), attempt
-            except Exception as exc:
-                last_exc = exc
+                result = compress_image(*args, **kwargs)
+                last_result = result
+                if result[1] != "failed":
+                    return result, attempt
                 if attempt < self.max_retries:
                     time.sleep(0.5)
+            except Exception as exc:
+                last_exc = exc
+                logger.error("压缩线程异常: %s", exc, exc_info=True)
+                if attempt < self.max_retries:
+                    time.sleep(0.5)
+                else:
+                    raise
+        if last_result is not None:
+            return last_result, self.max_retries
         raise last_exc
 
     def run(self) -> None:
+        try:
+            self._run_impl()
+        except Exception as exc:
+            logger.error("压缩任务异常退出: %s", exc, exc_info=True)
+            payload = {"error": str(exc), "state": "Error"}
+            self.result.emit(payload)
+            self.finished.emit(payload)
+
+    def _run_impl(self) -> None:
         start_ts = time.time()
         self.state_changed.emit("Validating", {})
 
@@ -142,11 +187,15 @@ class CompressWorker(QObject):
                 "smart_mode": self.smart_mode,
                 "target_size_kb": self.target_size_kb,
                 "incremental": self.incremental,
+                "keep_exif": self.keep_exif,
+                "auto_rotate": self.auto_rotate,
+                "rename_pattern": self.rename_pattern,
+                "min_size_mb": self.min_size_mb,
             }
         )
 
         self.state_changed.emit("Scanning", {})
-        all_files = self._collect_images(input_path, self.include_subdirs)
+        all_files = collect_images(input_path, self.include_subdirs)
         total = len(all_files)
         if total == 0:
             payload = {"error": "未找到可处理图片", "state": "Error"}
@@ -161,88 +210,113 @@ class CompressWorker(QObject):
         status_counter = {"processed": 0, "skipped": 0, "too_small": 0, "failed": 0, "cached": 0}
         total_orig = 0
         total_comp = 0
+        completed = 0
+        next_index = 0
+        pending = {}
+        max_in_flight = max(1, worker_count * 2)
 
-        with ThreadPoolExecutor(max_workers=worker_count) as executor:
-            self._executor = executor
-            future_to_meta = {
-                executor.submit(
-                    self._compress_with_retry,
-                    file_path,
-                    input_path,
-                    output_path,
-                    self.quality,
-                    min_size_bytes,
-                    self.overwrite,
-                    self.max_width,
-                    self.max_height,
-                    self.keep_ratio,
-                    self.output_format,
-                    self.smart_mode,
-                    self.target_size_kb,
-                    self.rename_pattern,
-                    index,
-                    settings_hash if self.incremental else None,
-                    self.keep_exif,
-                    self.auto_rotate,
-                    self.backup_set,
-                ): (index, file_path)
-                for index, file_path in enumerate(all_files)
-            }
+        def submit_one(executor: ThreadPoolExecutor) -> None:
+            nonlocal next_index
+            if self._is_canceled or next_index >= total:
+                return
+            self._pause_event.wait()
+            if self._is_canceled:
+                return
+            index = next_index
+            file_path = all_files[index]
+            next_index += 1
+            future = executor.submit(
+                self._compress_with_retry,
+                file_path,
+                input_path,
+                output_path,
+                self.quality,
+                min_size_bytes,
+                self.overwrite,
+                self.max_width,
+                self.max_height,
+                self.keep_ratio,
+                self.output_format,
+                self.smart_mode,
+                self.target_size_kb,
+                self.rename_pattern,
+                index,
+                settings_hash if self.incremental else None,
+                self.keep_exif,
+                self.auto_rotate,
+                self.backup_set,
+            )
+            pending[future] = (index, file_path)
 
-            completed = 0
-            for future in as_completed(future_to_meta):
+        executor = ThreadPoolExecutor(max_workers=worker_count)
+        self._executor = executor
+        try:
+            for _ in range(min(max_in_flight, total)):
+                if self._is_canceled:
+                    break
+                submit_one(executor)
+
+            while pending:
+                if self._is_canceled:
+                    break
                 self._pause_event.wait()
                 if self._is_canceled:
                     break
+                done, _ = wait(list(pending.keys()), timeout=0.2, return_when=FIRST_COMPLETED)
+                if not done:
+                    continue
+                for future in done:
+                    index, fallback_path = pending.pop(future)
+                    try:
+                        (src_path, status, orig_size, new_size, details), retry_count = future.result()
+                    except Exception as exc:
+                        logger.error("任务失败 %s: %s", fallback_path, exc, exc_info=True)
+                        src_path = fallback_path
+                        status = "failed"
+                        orig_size = 0
+                        new_size = 0
+                        details = {}
+                        retry_count = self.max_retries
 
-                index, _ = future_to_meta[future]
-                try:
-                    (src_path, status, orig_size, new_size, details), retry_count = future.result()
-                except Exception as exc:
-                    src_path = _
-                    status = "failed"
-                    orig_size = 0
-                    new_size = 0
-                    details = {}
-                    retry_count = self.max_retries
+                    status_counter[status] = status_counter.get(status, 0) + 1
+                    if status in {"processed", "cached"}:
+                        total_orig += orig_size
+                        total_comp += new_size
 
-                status_counter[status] = status_counter.get(status, 0) + 1
-
-                if status in {"processed", "cached"}:
-                    total_orig += orig_size
-                    total_comp += new_size
-
-                record = {
-                    "index": index + 1,
-                    "path": str(src_path),
-                    "filename": src_path.name if hasattr(src_path, "name") else str(src_path),
-                    "status": status,
-                    "original_size": orig_size,
-                    "compressed_size": new_size,
-                    "details": details,
-                    "retry_count": retry_count,
-                }
-                detailed_stats.append(record)
-                self.file_completed.emit(record)
-
-                completed += 1
-                elapsed = max(0.001, time.time() - start_ts)
-                rate = completed / elapsed
-                remaining = total - completed
-                eta_seconds = remaining / rate if rate > 0 else 0.0
-
-                self.progress.emit(
-                    {
-                        "current": completed,
-                        "total": total,
-                        "percent": int(completed / total * 100),
-                        "message": f"[{completed}/{total}] {status}: {src_path.name if hasattr(src_path, 'name') else src_path}",
-                        "rate": rate,
-                        "eta_seconds": eta_seconds,
+                    record = {
+                        "index": index + 1,
+                        "path": str(src_path),
+                        "filename": src_path.name if hasattr(src_path, "name") else str(src_path),
+                        "status": status,
+                        "original_size": orig_size,
+                        "compressed_size": new_size,
+                        "details": details,
+                        "retry_count": retry_count,
                     }
-                )
+                    detailed_stats.append(record)
+                    self.file_completed.emit(record)
 
-        self._executor = None
+                    completed += 1
+                    elapsed = max(0.001, time.time() - start_ts)
+                    rate = completed / elapsed
+                    remaining = total - completed
+                    eta_seconds = remaining / rate if rate > 0 else 0.0
+                    self.progress.emit(
+                        {
+                            "current": completed,
+                            "total": total,
+                            "percent": int(completed / total * 100),
+                            "message": f"[{completed}/{total}] {status}: {src_path.name if hasattr(src_path, 'name') else src_path}",
+                            "rate": rate,
+                            "eta_seconds": eta_seconds,
+                        }
+                    )
+                    if not self._is_canceled:
+                        submit_one(executor)
+        finally:
+            self._executor = None
+            _shutdown_executor(executor)
+
         self.state_changed.emit("Finalizing", {})
 
         saved = total_orig - total_comp
@@ -272,10 +346,3 @@ class CompressWorker(QObject):
             self.state_changed.emit("Done", payload)
         self.result.emit(payload)
         self.finished.emit(payload)
-
-    def _collect_images(self, input_path: Path, include_subdirs: bool) -> List[Path]:
-        if include_subdirs:
-            files = [p for p in input_path.rglob("*") if p.is_file() and p.suffix.lower() in IMAGE_EXTENSIONS]
-        else:
-            files = [p for p in input_path.iterdir() if p.is_file() and p.suffix.lower() in IMAGE_EXTENSIONS]
-        return sorted(files)
